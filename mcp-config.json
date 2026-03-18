@@ -1,4 +1,10 @@
 {
+  "host": "localhost",
+  "port": 3100,
+  "requireApiKey": false,
+  "apiKey": "",
+  "enableRunScript": false,
   "de4dotExePath": "",
-  "de4dotSearchPaths": []
+  "de4dotSearchPaths": [],
+  "de4dotMaxSearchDepth": 6
 }

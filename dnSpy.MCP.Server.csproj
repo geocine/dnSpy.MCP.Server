@@ -1,24 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
-  <Import Project="..\..\DnSpyCommon.props" />
+  <Import Project="$(MSBuildThisFileDirectory)dnSpy\DnSpyCommon.props" />
 
   <PropertyGroup>
     <AssemblyName>dnSpy.MCP.Server.x</AssemblyName>
     <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\..\dnSpy.snk</AssemblyOriginatorKeyFile>
-    <OutputPath>..\..\dnSpy\dnSpy\bin\$(Configuration)\</OutputPath>
+    <AssemblyOriginatorKeyFile>dnSpy\dnSpy.snk</AssemblyOriginatorKeyFile>
+    <OutputPath>dnSpy\dnSpy\bin\$(Configuration)\</OutputPath>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <CopyExtensionToRuntimeOutputs Condition="'$(CopyExtensionToRuntimeOutputs)' == ''">true</CopyExtensionToRuntimeOutputs>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net48' ">
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\dnSpy\dnSpy.Contracts.DnSpy\dnSpy.Contracts.DnSpy.csproj" />
-    <ProjectReference Include="..\..\dnSpy\dnSpy.Contracts.Logic\dnSpy.Contracts.Logic.csproj" />
-    <ProjectReference Include="..\..\dnSpy\dnSpy.Contracts.Debugger\dnSpy.Contracts.Debugger.csproj" />
-    <ProjectReference Include="..\..\dnSpy\dnSpy.Contracts.Debugger.DotNet\dnSpy.Contracts.Debugger.DotNet.csproj" />
-    <ProjectReference Include="..\..\dnSpy\dnSpy.Contracts.Debugger.DotNet.CorDebug\dnSpy.Contracts.Debugger.DotNet.CorDebug.csproj" />
+    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.DnSpy\dnSpy.Contracts.DnSpy.csproj" />
+    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Logic\dnSpy.Contracts.Logic.csproj" />
+    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger\dnSpy.Contracts.Debugger.csproj" />
+    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger.DotNet\dnSpy.Contracts.Debugger.DotNet.csproj" />
+    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger.DotNet.CorDebug\dnSpy.Contracts.Debugger.DotNet.CorDebug.csproj" />
   </ItemGroup>
 
   <!-- de4dot integration (deobfuscation engine) — DLLs bundled in libs/ -->
@@ -82,6 +89,7 @@
   <!-- For .NET Framework 4.8, we'll use a simpler HTTP listener approach -->
   <ItemGroup Condition=" '$(IsDotNetFramework)' == 'true' ">
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+    <PackageReference Include="System.Resources.Extensions" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
