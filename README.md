@@ -4,7 +4,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server embedd
 
 > Fork note: this repository is forked from [chichicaste/dnSpy.MCP.Server](https://github.com/chichicaste/dnSpy.MCP.Server).
 
-**Version**: 1.7.0 | **Tools**: 98 | **Status**: beta2 | **Targets**: .NET 4.8 + .NET 10.0-windows
+**Version**: 1.7.0 | **Tools**: 102 | **Status**: beta2 | **Targets**: .NET 4.8 + .NET 10.0-windows
 
 ---
 
@@ -52,7 +52,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server embedd
 | **Memory Dump** | List runtime modules, dump .NET or native modules from memory, read/write process memory, extract PE sections |
 | **Static PE Analysis** | Scan raw PE bytes for strings; all-in-one ConfuserEx unpacker |
 | **Deobfuscation** | de4dot integration: detect obfuscator, rename mangled symbols, decrypt strings. Both in-process (`deobfuscate_assembly`) and external process (`run_de4dot`) modes available in all builds |
-| **Window / Dialog** | List active dialog/message-box windows (Win32 `#32770` + WPF) in the dnSpy process; dismiss them by clicking any button by name (supports EN and ES) |
+| **Scripting** | Optional Roslyn C# scripting inside dnSpy via `run_script` (disabled by default) |
+| **Window / Dialog** | List active dialog/message-box windows (Win32 `#32770` + WPF) in the dnSpy process; dismiss them by clicking any button by name |
 | **Search** | Glob and regex search across all loaded assemblies |
 
 ---
@@ -73,31 +74,37 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server embedd
 ### Clone & Restore
 
 ```bash
-git clone https://github.com/dnSpyEx/dnSpy --recursive
-cd dnSpy
+git clone --recursive https://github.com/geocine/dnSpy.MCP.Server.git
+cd dnSpy.MCP.Server
+
+# If you cloned without --recursive
+git submodule update --init --recursive
 ```
+
+> The vendored `dnSpy/` source tree is required for builds in this checkout and is tracked as a git submodule.
 
 ### Build commands
 
 ```bash
 # Build only the MCP Server extension (Debug)
-dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Debug
+dotnet build dnSpy.MCP.Server.csproj -c Debug
 
 # Build only the MCP Server extension (Release)
-dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Release
+dotnet build dnSpy.MCP.Server.csproj -c Release
 
-# Build the full dnSpy solution (both targets)
-dotnet build dnSpy.sln -c Debug
+# Optionally build the bundled dnSpy host only
+# Note: dnSpy\dnSpy.sln does not include the repo-root MCP extension project
+dotnet build dnSpy\dnSpy.sln -c Debug
 
 # Build for a specific target framework only
-dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Release -f net10.0-windows
-dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Release -f net48
+dotnet build dnSpy.MCP.Server.csproj -c Release -f net10.0-windows
+dotnet build dnSpy.MCP.Server.csproj -c Release -f net48
 
 # Restore NuGet packages without building
-dotnet restore Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj
+dotnet restore dnSpy.MCP.Server.csproj
 
 # Clean build artifacts
-dotnet clean Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj
+dotnet clean dnSpy.MCP.Server.csproj
 ```
 
 ### Output locations
@@ -109,20 +116,22 @@ dotnet clean Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj
 
 > The MCP Server DLL is output directly into dnSpy's bin directory so it loads automatically when you start dnSpy.
 
+> **Known `net48` dnSpy host quirk**: some `dnSpy\dnSpy.sln` builds can leave theme files under `dnSpy\dnSpy\dnSpy\bin\Release\net48\bin\Themes\` even though dnSpy startup probes `dnSpy\dnSpy\dnSpy\bin\Release\net48\Themes\`. If startup fails with `ThemeService` / `Sequence contains no elements`, copy the `.dntheme` files into the top-level `Themes` folder before launching `dnSpy.exe`.
+
 ### Verify the build
 
 ```bash
-# Check for errors (expects "Compilación correcta" or "Build succeeded")
-dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Release --nologo 2>&1 | tail -5
+# Check for errors
+dotnet build dnSpy.MCP.Server.csproj -c Release --nologo
 ```
 
 ### Runtime
 
-1. Start dnSpy — the MCP server starts automatically on `http://localhost:3100`
+1. Start dnSpy - the MCP server starts automatically on `http://localhost:3100` when **Enable MCP Server** is on (default: enabled)
 2. Verify it is running:
    ```bash
    curl http://localhost:3100/health
-   curl http://localhost:3100/mcp
+   curl http://localhost:3100/
    ```
 3. Configure your MCP client (see next section)
 
@@ -213,8 +222,9 @@ Tools for inspecting the internals of a specific type.
 |------|-------------|-----------------|-----------------|
 | `get_type_info` | Full type overview: visibility, base type, interfaces, fields, properties, methods (paginated) | `assembly_name`, `type_full_name` | `cursor` |
 | `search_types` | Search for types by name across **all** loaded assemblies | `query` | `cursor` |
+| `search_methods` | Search for methods across all loaded assemblies, matching method name, signature, and declaring type | `query` | `assembly_name`, `type_pattern`, `cursor` |
 | `get_type_fields` | List fields matching a name pattern, with type, visibility, and `readonly`/`const` flags | `assembly_name`, `type_full_name`, `pattern` | `cursor` |
-| `get_type_property` | Full detail for a single property: getter/setter signatures, attributes | `assembly_name`, `type_full_name`, `property_name` | — |
+| `get_type_property` | Full detail for a single property: getter/setter signatures, attributes | `assembly_name`, `type_full_name`, `property_name` | - |
 | `list_properties_in_type` | Summary list of all properties with read/write flags | `assembly_name`, `type_full_name` | `cursor` |
 | `list_events_in_type` | All events with `add`/`remove` method info | `assembly_name`, `type_full_name` | — |
 | `list_nested_types` | All nested types recursively (full name, visibility, kind) | `assembly_name`, `type_full_name` | — |
@@ -228,6 +238,7 @@ Tools for inspecting the internals of a specific type.
 |-----------|------|-------------|
 | `type_full_name` | string | Fully-qualified type name (e.g. `MyNamespace.MyClass`) |
 | `query` | string | Substring, glob, or regex matched against `FullName` |
+| `type_pattern` | string | Optional declaring-type glob or regex filter for `search_methods` |
 | `pattern` | string | Glob or regex for field name matching; use `*` to list all |
 | `property_name` | string | Exact property name (case-insensitive) |
 | `member_name` | string | Member name for attribute lookup (omit to get type-level attributes) |
@@ -312,12 +323,15 @@ In-memory metadata editing. Changes are applied immediately to dnlib's in-memory
 | Tool | Description | Required params | Optional params |
 |------|-------------|-----------------|-----------------|
 | `change_member_visibility` | Change the access modifier of a type or one of its members | `assembly_name`, `type_full_name`, `member_kind`, `new_visibility` | `member_name` |
-| `rename_member` | Rename a type or one of its members | `assembly_name`, `type_full_name`, `member_kind`, `old_name`, `new_name` | — |
+| `rename_member` | Rename a type or one of its members | `assembly_name`, `type_full_name`, `member_kind`, `old_name`, `new_name` | - |
+| `rename_method` | Rename a method using its declaring type and optional metadata token; preferred for overloaded methods | `assembly_name`, `type_full_name`, `method_name`, `new_name` | `method_token` |
 | `save_assembly` | Write the (possibly modified) assembly to disk using dnlib's `ModuleWriter` | `assembly_name` | `output_path` |
-| `get_assembly_metadata` | Read assembly-level metadata: name, version, culture, public key, flags, hash algorithm, module count, custom attributes | `assembly_name` | — |
+| `get_assembly_metadata` | Read assembly-level metadata: name, version, culture, public key, flags, hash algorithm, module count, custom attributes | `assembly_name` | - |
 | `edit_assembly_metadata` | Edit assembly-level metadata fields: name, version, culture, or hash algorithm | `assembly_name` | `name`, `version`, `culture`, `hash_algorithm` |
-| `set_assembly_flags` | Set or clear an individual assembly attribute flag (e.g. `PublicKey`, `Retargetable`, processor architecture) | `assembly_name`, `flag_name`, `value` | — |
-| `list_assembly_references` | List all assembly references (AssemblyRef table entries) in the manifest module | `assembly_name` | — |
+| `list_assembly_attributes` | List all assembly-level custom attributes (`[assembly: ...]`) | `assembly_name` | - |
+| `remove_assembly_attribute` | Remove one or more assembly-level custom attributes by simple or fully-qualified type name | `assembly_name`, `attribute_type_name` | `index` |
+| `set_assembly_flags` | Set or clear an individual assembly attribute flag (e.g. `PublicKey`, `Retargetable`, processor architecture) | `assembly_name`, `flag_name`, `value` | - |
+| `list_assembly_references` | List all assembly references (AssemblyRef table entries) in the manifest module | `assembly_name` | - |
 | `add_assembly_reference` | Add an assembly reference by loading a DLL from disk. Creates a TypeForwarder to anchor the reference | `assembly_name`, `dll_path` | — |
 | `remove_assembly_reference` | Remove an AssemblyRef entry and all TypeForwarder entries that target it. Returns a warning if TypeRefs in code still use the reference | `assembly_name`, `reference_name` | — |
 | `inject_type_from_dll` | Deep-clone a type (fields, methods with IL, properties, events) from an external DLL into the target assembly | `assembly_name`, `dll_path`, `type_full_name` | — |
@@ -332,7 +346,10 @@ In-memory metadata editing. Changes are applied immediately to dnlib's in-memory
 | `new_visibility` | string | `public`, `private`, `protected`, `internal`, `protected_internal`, `private_protected` |
 | `old_name` | string | Current member name |
 | `new_name` | string | Desired new name |
+| `method_token` | string | Optional metadata token like `0x06001234` to disambiguate overloaded methods in `rename_method` |
 | `output_path` | string | Absolute path for output file. Defaults to the original file location. |
+| `attribute_type_name` | string | Simple or fully-qualified attribute type name (e.g. `SuppressIldasmAttribute`) |
+| `index` | integer | Optional zero-based match index for `remove_assembly_attribute`; omit to remove all matches |
 | `flag_name` | string | Assembly flag to toggle (e.g. `PublicKey`, `Retargetable`, `PA_MSIL`, `PA_x86`, `PA_AMD64`) |
 | `value` | boolean | `true` to set the flag, `false` to clear it |
 | `dll_path` | string | Absolute path to the source DLL |
@@ -521,18 +538,23 @@ Tools that operate on raw PE file bytes — no debug session required.
 
 | Tool | Description | Required params | Optional params |
 |------|-------------|-----------------|-----------------|
-| `scan_pe_strings` | Scan raw PE file bytes for printable ASCII and UTF-16 strings. Useful for finding URLs, API keys, IP addresses, and embedded plaintext in packed/obfuscated assemblies | `assembly_name` | `min_length`, `encoding` |
-| `unpack_from_memory` | All-in-one ConfuserEx unpacker: launches the EXE under the debugger (pausing at `EntryPoint` after decryption), dumps the main module with PE-layout fix, and optionally stops the session. Output can be loaded in dnSpy or passed to `deobfuscate_assembly` | `exe_path` | `output_path`, `stop_after_dump` |
+| `scan_pe_strings` | Scan raw PE file bytes for printable ASCII and UTF-16 strings. Supports scanning a loaded assembly by name or a PE file directly by path | `assembly_name` or `file_path` | `min_length`, `encoding`, `include_utf16`, `filter_pattern` |
+| `unpack_from_memory` | All-in-one ConfuserEx unpacker: launches the EXE under the debugger (pausing at `EntryPoint` after decryption), dumps the main module with PE-layout fix, and optionally stops the session. Output can be loaded in dnSpy or passed to `deobfuscate_assembly` | `exe_path` | `output_path`, `timeout_ms`, `stop_after_dump`, `module_name` |
 
 #### Parameter details
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `min_length` | integer | Minimum string length to include (default `4`) |
-| `encoding` | string | `ascii`, `unicode`, or `both` (default `both`) |
+| `file_path` | string | Direct path to a PE file on disk. Takes priority over `assembly_name` when both are supplied |
+| `min_length` | integer | Minimum string length to include (default `5`) |
+| `encoding` | string | Scan mode alias: `ascii`, `unicode`/`utf16`, or `both` (default `both`) |
+| `include_utf16` | boolean | Explicitly enable/disable UTF-16 scanning (default `true`) |
+| `filter_pattern` | string | Optional regex filter applied to extracted strings |
 | `exe_path` | string | Absolute path to the packed EXE to unpack |
-| `output_path` | string | Destination for the unpacked PE (default: `<original_name>_unpacked.exe` next to the input) |
+| `output_path` | string | Destination for the unpacked PE (default: `<original_name>_unpacked<ext>` next to the input) |
+| `timeout_ms` | integer | Max milliseconds to wait for the process to pause at entry point (default `30000`) |
 | `stop_after_dump` | boolean | Whether to stop the debug session after dumping (default `true`) |
+| `module_name` | string | Override module name to dump when auto-detection is ambiguous |
 
 > **Workflow**: `scan_pe_strings` → understand what the packed binary contains → `unpack_from_memory` → `deobfuscate_assembly` → load the clean file in dnSpy.
 
@@ -546,7 +568,7 @@ Two de4dot integration modes: **in-process** (`deobfuscate_assembly` — uses bu
 |------|-------------|-----------------|-----------------|
 | `list_deobfuscators` | List all obfuscator types supported by the in-process de4dot engine | — | — |
 | `detect_obfuscator` | Detect which obfuscator was applied to a .NET assembly file on disk using de4dot's heuristic detection | `file_path` | — |
-| `deobfuscate_assembly` | Deobfuscate a .NET assembly in-process: renames mangled symbols, deobfuscates control flow, decrypts strings | `file_path`, `output_path` | `obfuscator_type`, `rename_symbols` |
+| `deobfuscate_assembly` | Deobfuscate a .NET assembly in-process: renames mangled symbols, deobfuscates control flow, decrypts strings | `file_path` | `output_path`, `method`, `obfuscator_type`, `rename_symbols`, `control_flow`, `keep_obfuscator_types`, `string_decrypter`, `timeout_seconds` |
 | `save_deobfuscated` | Return a previously deobfuscated file as a Base64-encoded blob. Useful when the output file cannot be accessed directly | `file_path` | — |
 | `run_de4dot` | Run `de4dot.exe` as an external process. Supports dynamic string decryption and ConfuserEx method decryption that require a separate process | `file_path` | `output_path`, `obfuscator_type`, `dont_rename`, `no_cflow_deob`, `string_decrypter`, `extra_args`, `de4dot_path`, `timeout_ms` |
 
@@ -555,15 +577,36 @@ Two de4dot integration modes: **in-process** (`deobfuscate_assembly` — uses bu
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `file_path` | string | Absolute path to the .NET assembly on disk |
-| `output_path` | string | Absolute path for the cleaned output assembly |
-| `obfuscator_type` | string | Force a specific obfuscator type code (`cr` for ConfuserEx, `un` for unknown/auto, etc.). Omit to let de4dot auto-detect. |
+| `output_path` | string | Absolute path for the cleaned output assembly. For `deobfuscate_assembly`, defaults to `<name>-cleaned<ext>` next to the input |
+| `method` | string | (`deobfuscate_assembly`) Force a specific deobfuscator by Type, Name, or TypeLong |
+| `obfuscator_type` | string | Alias for the deobfuscator selector. For `run_de4dot`, uses de4dot short codes such as `cr` |
 | `rename_symbols` | boolean | (`deobfuscate_assembly`) Whether to rename obfuscated symbols (default `true`) |
+| `control_flow` | boolean | (`deobfuscate_assembly`) Whether to deobfuscate control flow (default `true`) |
+| `keep_obfuscator_types` | boolean | (`deobfuscate_assembly`) Keep obfuscator-internal helper types in output (default `false`) |
+| `timeout_seconds` | integer | (`deobfuscate_assembly`) Timeout in seconds (default `120`, minimum `10`) |
 | `dont_rename` | boolean | (`run_de4dot`) Skip symbol renaming if `true` (default `false`) |
 | `no_cflow_deob` | boolean | (`run_de4dot`) Skip control-flow deobfuscation if `true` (default `false`) |
 | `string_decrypter` | string | (`run_de4dot`) String decrypter mode: `none`, `default`, `static`, `delegate`, `emulate` |
 | `extra_args` | string | (`run_de4dot`) Additional de4dot command-line arguments passed verbatim |
 | `de4dot_path` | string | (`run_de4dot`) Override path to `de4dot.exe`. Defaults to well-known search paths. |
 | `timeout_ms` | integer | (`run_de4dot`) Max milliseconds to wait for de4dot to finish (default `120000`) |
+
+---
+
+### Scripting Tools
+
+Roslyn-based C# scripting inside dnSpy's process. This tool is disabled by default and requires `enableRunScript: true` in `mcp-config.json`.
+
+| Tool | Description | Required params | Optional params |
+|------|-------------|-----------------|-----------------|
+| `run_script` | Execute arbitrary C# code with access to dnSpy APIs, loaded modules, and the debugger manager | `code` | `timeout_seconds` |
+
+#### Parameter details
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `code` | string | C# code to execute inside dnSpy's process |
+| `timeout_seconds` | integer | Maximum execution time in seconds (default `30`) |
 
 ---
 
@@ -581,9 +624,9 @@ Enumerate and dismiss dialog boxes (Win32 `MessageBox`, `#32770` dialogs, and WP
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `hwnd` | string | Hex HWND of the target dialog, as returned by `list_dialogs` (e.g. `"1A2B3C"`). If omitted, the first active dialog is used |
-| `button` | string | Button to click (case-insensitive, EN and ES): `ok`/`aceptar`, `yes`/`sí`, `no`, `cancel`/`cancelar`, `retry`/`reintentar`, `ignore`/`omitir`. Default: `ok` |
+| `button` | string | Button to click (case-insensitive): `ok`, `accept`, `yes`, `no`, `cancel`, `retry`, `ignore`. Default: `ok` |
 
-> **Button matching** — the tool first checks common exact tokens (EN + ES), then falls back to substring matching. If no button matches, `WM_CLOSE` is sent to the dialog.
+> **Button matching** - the tool first checks common exact tokens, then falls back to substring matching. If no button matches, `WM_CLOSE` is sent to the dialog.
 
 #### Example
 
@@ -765,13 +808,13 @@ To fetch the next page, pass the `nextCursor` value as the `cursor` argument in 
 
 ```json
 { "tool": "list_dialogs" }
-// → [1] Title: "Error de depuración"
+// → [1] Title: "Debug Error"
 //       Hwnd: 1A2B3C  |  Type: Win32 (#32770)
-//       Message: "No se puede continuar la operación."
-//       Buttons: Aceptar, Cancelar
+//       Message: "The operation could not continue."
+//       Buttons: OK, Cancel
 
-{ "tool": "close_dialog", "arguments": { "hwnd": "1A2B3C", "button": "aceptar" } }
-// → Clicked 'Aceptar' in dialog 'Error de depuración'.
+{ "tool": "close_dialog", "arguments": { "hwnd": "1A2B3C", "button": "ok" } }
+// → Clicked 'OK' in dialog 'Debug Error'.
 ```
 
 ### Find all callers and usages of a suspicious type
@@ -856,7 +899,7 @@ dnSpy.MCP.Server/
 
 ### `mcp-config.json`
 
-A `mcp-config.json` file is created automatically next to the MCP Server DLL on first run. Edit it to change network or de4dot settings — **no rebuild required**.
+A `mcp-config.json` file is created automatically next to the MCP Server DLL on first run. The repo root also includes a matching sample file that is copied beside the DLL during builds. Edit it to change network or de4dot settings - **no rebuild required**.
 
 ```json
 {
@@ -924,6 +967,7 @@ netstat -ano | findstr :3100
 | `Connection refused` from VM / sandbox | `host` is still `"localhost"` | Set `"host": "0.0.0.0"` in `mcp-config.json` and run `netsh http add urlacl url=http://+:3100/ user=Everyone` as Administrator. |
 | `Access denied` when binding to `0.0.0.0` | Missing URL ACL | Run `netsh http add urlacl url=http://+:3100/ user=Everyone` as Administrator (replace `3100` with your configured port). |
 | Debug session appears frozen / no response | A dialog box is blocking the UI thread | Call `list_dialogs` to detect open dialogs, then `close_dialog` to dismiss them and unblock the session. |
+| dnSpy crashes on startup with `ThemeService` / `Sequence contains no elements` | `net48` theme files were copied to `bin\Themes` instead of `Themes` | Copy `dnSpy\dnSpy\dnSpy\bin\Release\net48\bin\Themes\*.dntheme` to `dnSpy\dnSpy\dnSpy\bin\Release\net48\Themes\`, then relaunch `dnSpy.exe` |
 
 ---
 
