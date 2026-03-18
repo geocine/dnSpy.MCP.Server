@@ -96,6 +96,12 @@ dotnet build dnSpy.MCP.Server.csproj -c Release
 # Note: dnSpy\dnSpy.sln does not include the repo-root MCP extension project
 dotnet build dnSpy\dnSpy.sln -c Debug
 
+# Build only the dnSpy net48 host executable
+dotnet build dnSpy\dnSpy\dnSpy\dnSpy.csproj -c Release -f net48
+
+# Or use the repo-supported dnSpy build script for net48 host artifacts
+powershell -ExecutionPolicy Bypass -File dnSpy\build.ps1 -buildtfm netframework -NoMsbuild
+
 # Build for a specific target framework only
 dotnet build dnSpy.MCP.Server.csproj -c Release -f net10.0-windows
 dotnet build dnSpy.MCP.Server.csproj -c Release -f net48
@@ -117,6 +123,8 @@ dotnet clean dnSpy.MCP.Server.csproj
 > The MCP Server DLL is output directly into dnSpy's bin directory so it loads automatically when you start dnSpy.
 
 > **Known `net48` dnSpy host quirk**: some `dnSpy\dnSpy.sln` builds can leave theme files under `dnSpy\dnSpy\dnSpy\bin\Release\net48\bin\Themes\` even though dnSpy startup probes `dnSpy\dnSpy\dnSpy\bin\Release\net48\Themes\`. If startup fails with `ThemeService` / `Sequence contains no elements`, copy the `.dntheme` files into the top-level `Themes` folder before launching `dnSpy.exe`.
+
+> **Known `dnSpy.sln` build pitfall**: avoid forcing `-p:TargetFramework=net48` on `dnSpy\dnSpy.sln`. Some Roslyn helper projects in the solution target `netstandard2.0` and `net10.0-windows`, so a solution-wide `net48` override can fail with `NETSDK1005`. Build the solution without a target-framework override, or build `dnSpy\dnSpy\dnSpy\dnSpy.csproj -f net48` when you only need the .NET Framework host.
 
 ### Verify the build
 
@@ -968,6 +976,7 @@ netstat -ano | findstr :3100
 | `Access denied` when binding to `0.0.0.0` | Missing URL ACL | Run `netsh http add urlacl url=http://+:3100/ user=Everyone` as Administrator (replace `3100` with your configured port). |
 | Debug session appears frozen / no response | A dialog box is blocking the UI thread | Call `list_dialogs` to detect open dialogs, then `close_dialog` to dismiss them and unblock the session. |
 | dnSpy crashes on startup with `ThemeService` / `Sequence contains no elements` | `net48` theme files were copied to `bin\Themes` instead of `Themes` | Copy `dnSpy\dnSpy\dnSpy\bin\Release\net48\bin\Themes\*.dntheme` to `dnSpy\dnSpy\dnSpy\bin\Release\net48\Themes\`, then relaunch `dnSpy.exe` |
+| `NETSDK1005` when building `dnSpy\dnSpy.sln` with `-p:TargetFramework=net48` | A solution-wide target-framework override is being applied to Roslyn helper projects that do not target `net48` | Remove the solution-level `TargetFramework` override. Use `dotnet build dnSpy\dnSpy.sln -c Release` for the full solution, or `dotnet build dnSpy\dnSpy\dnSpy\dnSpy.csproj -c Release -f net48` for the .NET Framework host only |
 
 ---
 
