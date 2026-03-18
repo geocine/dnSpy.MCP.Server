@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module. 
 
@@ -21,9 +22,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Threading.Tasks;
 using dnSpy.Contracts.Extension;
 using dnSpy.Contracts.Output;
+using dnSpy.Contracts.Scripting;
 using dnSpy.Contracts.Text;
+using dnSpy.MCP.Server.Application;
+using dnSpy.MCP.Server.Communication;
+using dnSpy.MCP.Server.Presentation;
 
 namespace dnSpy.MCP.Server.Helper {
 	/// <summary>
@@ -284,6 +290,64 @@ namespace dnSpy.MCP.Server.Helper {
 				catch {
 					// ignore
 				}
+			}
+		}
+	}
+
+	// net10 reliably composes auto-loaded parts even when extension lifecycle events are delayed or absent.
+	// Start the server from this path so the settings toggle works on first launch without depending on IExtension.
+	[ExportAutoLoaded(Order = double.MinValue + 1)]
+	public sealed class McpStartupAutoLoaded : IAutoLoaded {
+		[ImportingConstructor]
+		public McpStartupAutoLoaded(Lazy<McpServer> mcpServer, McpSettings mcpSettings, IServiceLocator serviceLocator) {
+			_ = Task.Run(async () => {
+				try {
+					await Task.Delay(750).ConfigureAwait(false);
+					LogServiceAvailability(serviceLocator);
+
+					if (!mcpSettings.EnableServer) {
+						McpLogger.Info("MCP startup skipped because EnableServer is false");
+						return;
+					}
+
+					if (mcpServer.Value.IsRunning) {
+						McpLogger.Debug("MCP startup skipped because server is already running");
+						return;
+					}
+
+					McpLogger.Info("Auto-loaded startup path starting MCP server");
+					mcpServer.Value.Start();
+				}
+				catch (Exception ex) {
+					McpLogger.Exception(ex, "Auto-loaded MCP startup failed");
+				}
+			});
+		}
+
+		static void LogServiceAvailability(IServiceLocator serviceLocator) {
+			LogService<McpTools>(serviceLocator);
+			LogService<AssemblyTools>(serviceLocator);
+			LogService<TypeTools>(serviceLocator);
+			LogService<EditTools>(serviceLocator);
+			LogService<DebugTools>(serviceLocator);
+			LogService<DumpTools>(serviceLocator);
+			LogService<MemoryInspectTools>(serviceLocator);
+			LogService<UsageFindingCommandTools>(serviceLocator);
+			LogService<CodeAnalysisHelpers>(serviceLocator);
+			LogService<SkillsTools>(serviceLocator);
+			LogService<ScriptTools>(serviceLocator);
+			LogService<WindowTools>(serviceLocator);
+			LogService<De4dotTools>(serviceLocator);
+			LogService<De4dotExeTool>(serviceLocator);
+		}
+
+		static void LogService<T>(IServiceLocator serviceLocator) where T : class {
+			try {
+				var service = serviceLocator.TryResolve<T>();
+				McpLogger.Info($"{typeof(T).Name} available: {service != null}");
+			}
+			catch (Exception ex) {
+				McpLogger.Exception(ex, $"Failed checking availability of {typeof(T).Name}");
 			}
 		}
 	}

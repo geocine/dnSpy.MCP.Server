@@ -55,7 +55,7 @@ namespace dnSpy.MCP.Server.Presentation {
 				}
 			}
 		}
-		bool enableServer = false;
+		bool enableServer = true;
 
 		/// <summary>
 		/// Gets or sets the server host (default: localhost).
