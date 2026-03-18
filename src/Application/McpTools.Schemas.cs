@@ -275,6 +275,10 @@ namespace dnSpy.MCP.Server.Application
                         ["type_full_name"] = new Dictionary<string, object> {
                             ["type"] = "string",
                             ["description"] = "Full name of the type"
+                        },
+                        ["cursor"] = new Dictionary<string, object> {
+                            ["type"] = "string",
+                            ["description"] = "Pagination cursor from previous response nextCursor"
                         }
                     },
                     ["required"] = new List<string> { "assembly_name", "type_full_name" }
@@ -632,6 +636,7 @@ namespace dnSpy.MCP.Server.Application
                         ["assembly_name"]    = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Name of the loaded assembly to scan. Required unless file_path is provided." },
                         ["file_path"]        = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Direct absolute path to the PE file on disk. Takes priority over assembly_name. Use this when multiple assemblies share the same internal name." },
                         ["min_length"]       = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "Minimum string length to include (default 5)" },
+                        ["encoding"]         = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Encoding scan mode alias: ascii, unicode, utf16, or both. When omitted, ASCII + UTF-16 are scanned." },
                         ["include_utf16"]    = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "Also scan for UTF-16 LE strings (default true)" },
                         ["filter_pattern"]   = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Optional regex to filter results (e.g. 'https?://' to find only URLs)" }
                     },
@@ -1288,12 +1293,12 @@ namespace dnSpy.MCP.Server.Application
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
                         ["exe_path"]       = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Absolute path to the packed/protected .NET Framework EXE" },
-                        ["output_path"]    = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Absolute path to write the unpacked EXE (directories are created automatically)" },
+                        ["output_path"]    = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Optional path to write the unpacked EXE. Defaults to <original_name>_unpacked<ext> next to the input file." },
                         ["timeout_ms"]     = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "Max milliseconds to wait for the process to pause at entry point (default 30000)" },
                         ["stop_after_dump"]= new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "Stop the debug session after dumping (default true)" },
                         ["module_name"]    = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Override module name to search for (default: EXE filename). Use list_runtime_modules to discover names if auto-detect fails." }
                     },
-                    ["required"] = new List<string> { "exe_path", "output_path" }
+                    ["required"] = new List<string> { "exe_path" }
                 }
             },
         };
@@ -1348,6 +1353,7 @@ namespace dnSpy.MCP.Server.Application
                         ["file_path"]             = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Absolute path to the obfuscated DLL or EXE" },
                         ["output_path"]           = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Output path for the cleaned file (default: <name>-cleaned<ext> next to input)" },
                         ["method"]                = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Force a specific deobfuscator by Type, Name, or TypeLong (e.g. 'cr' for ConfuserEx). Auto-detected if omitted." },
+                        ["obfuscator_type"]       = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Alias for 'method'. Accepts short de4dot codes such as 'cr'." },
                         ["rename_symbols"]        = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "Rename obfuscated symbols (default true)" },
                         ["control_flow"]          = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "Deobfuscate control flow (default true)" },
                         ["keep_obfuscator_types"] = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "Keep obfuscator-internal types in the output (default false)" },
@@ -1484,7 +1490,7 @@ namespace dnSpy.MCP.Server.Application
                 Name = "close_dialog",
                 Description = "Close a dialog/message-box window by clicking a button. " +
                     "If no HWND given, closes the first active dialog found. " +
-                    "Button matching is case-insensitive and supports English button names: " +
+                    "Button matching is case-insensitive and supports common English button names: " +
                     "ok/accept, yes, no, cancel, retry, ignore.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
@@ -1495,7 +1501,7 @@ namespace dnSpy.MCP.Server.Application
                         },
                         ["button"] = new Dictionary<string, object> {
                             ["type"] = "string",
-                            ["description"] = "Button to click: ok (default), yes, no, cancel, retry, ignore."
+                            ["description"] = "Button to click: ok (default), accept, yes, no, cancel, retry, or ignore."
                         }
                     },
                     ["required"] = new List<string>()

@@ -22,6 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -340,31 +341,43 @@ namespace dnSpy.MCP.Server.Application
 
         static bool ButtonMatches(string pref, string btnText)
         {
-            string lower = btnText.ToLowerInvariant();
-            switch (pref)
+            string lower = NormalizeButtonText(btnText);
+            switch (NormalizeButtonText(pref))
             {
                 case "ok":
                 case "accept":
-                    return lower == "ok" || lower == "accept";
+                    return lower == "ok" || lower == "accept" || lower == "aceptar";
 
                 case "yes":
-                    return lower == "yes";
+                    return lower == "yes" || lower == "si";
 
                 case "no":
                     return lower == "no";
 
                 case "cancel":
-                    return lower == "cancel";
+                    return lower == "cancel" || lower == "cancelar";
 
                 case "retry":
-                    return lower == "retry";
+                    return lower == "retry" || lower == "reintentar";
 
                 case "ignore":
-                    return lower == "ignore";
+                    return lower == "ignore" || lower == "omitir";
 
                 default:
-                    return lower.Contains(pref);
+                    return lower.Contains(NormalizeButtonText(pref));
             }
+        }
+
+        static string NormalizeButtonText(string value)
+        {
+            var normalized = value.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(normalized.Length);
+            foreach (var ch in normalized)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                    sb.Append(char.ToLowerInvariant(ch));
+            }
+            return sb.ToString().Normalize(NormalizationForm.FormC).Trim();
         }
     }
 }

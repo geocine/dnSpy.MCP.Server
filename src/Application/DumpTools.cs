@@ -720,11 +720,21 @@ namespace dnSpy.MCP.Server.Application {
 				throw new ArgumentException("Arguments required");
 			if (!arguments.TryGetValue("exe_path", out var exePathObj))
 				throw new ArgumentException("exe_path is required");
-			if (!arguments.TryGetValue("output_path", out var outputPathObj))
-				throw new ArgumentException("output_path is required");
 
-			var exePath    = exePathObj.ToString()    ?? string.Empty;
-			var outputPath = outputPathObj.ToString() ?? string.Empty;
+			var exePath = exePathObj.ToString() ?? string.Empty;
+			string outputPath;
+			if (arguments.TryGetValue("output_path", out var outputPathObj) &&
+			    !string.IsNullOrWhiteSpace(outputPathObj?.ToString()))
+			{
+				outputPath = outputPathObj!.ToString()!;
+			}
+			else
+			{
+				var exeDir = Path.GetDirectoryName(exePath) ?? Directory.GetCurrentDirectory();
+				var exeStem = Path.GetFileNameWithoutExtension(exePath);
+				var exeExt = Path.GetExtension(exePath);
+				outputPath = Path.Combine(exeDir, exeStem + "_unpacked" + exeExt);
+			}
 
 			if (!File.Exists(exePath))
 				throw new ArgumentException($"File not found: {exePath}");

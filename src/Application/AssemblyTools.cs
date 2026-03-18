@@ -330,7 +330,28 @@ namespace dnSpy.MCP.Server.Application
                 int.TryParse(minLenObj.ToString(), out var ml) && ml > 0)
                 minLength = ml;
 
+            bool includeAscii = true;
             bool includeUtf16 = true;
+            if (arguments.TryGetValue("encoding", out var encodingObj) && !string.IsNullOrWhiteSpace(encodingObj?.ToString()))
+            {
+                switch (encodingObj!.ToString()!.Trim().ToLowerInvariant())
+                {
+                    case "ascii":
+                        includeAscii = true;
+                        includeUtf16 = false;
+                        break;
+                    case "unicode":
+                    case "utf16":
+                    case "utf-16":
+                        includeAscii = false;
+                        includeUtf16 = true;
+                        break;
+                    case "both":
+                        includeAscii = true;
+                        includeUtf16 = true;
+                        break;
+                }
+            }
             if (arguments.TryGetValue("include_utf16", out var utf16Obj))
                 bool.TryParse(utf16Obj.ToString(), out includeUtf16);
 
@@ -348,27 +369,30 @@ namespace dnSpy.MCP.Server.Application
             var found = new List<(string Encoding, string Offset, string Value)>();
             var seen = new HashSet<string>();
 
-            // Scan ASCII strings
             int start = -1;
-            for (int i = 0; i <= bytes.Length; i++)
+            if (includeAscii)
             {
-                bool printable = i < bytes.Length && bytes[i] >= 0x20 && bytes[i] < 0x7F;
-                if (printable)
+                // Scan ASCII strings
+                for (int i = 0; i <= bytes.Length; i++)
                 {
-                    if (start < 0) start = i;
-                }
-                else
-                {
-                    if (start >= 0)
+                    bool printable = i < bytes.Length && bytes[i] >= 0x20 && bytes[i] < 0x7F;
+                    if (printable)
                     {
-                        int len = i - start;
-                        if (len >= minLength)
+                        if (start < 0) start = i;
+                    }
+                    else
+                    {
+                        if (start >= 0)
                         {
-                            var s = Encoding.ASCII.GetString(bytes, start, len);
-                            if ((filterRx == null || filterRx.IsMatch(s)) && seen.Add(s))
-                                found.Add(("ASCII", $"0x{start:X}", s));
+                            int len = i - start;
+                            if (len >= minLength)
+                            {
+                                var s = Encoding.ASCII.GetString(bytes, start, len);
+                                if ((filterRx == null || filterRx.IsMatch(s)) && seen.Add(s))
+                                    found.Add(("ASCII", $"0x{start:X}", s));
+                            }
+                            start = -1;
                         }
-                        start = -1;
                     }
                 }
             }

@@ -217,6 +217,12 @@ namespace dnSpy.MCP.Server.Application
             string? method = null;
             if (arguments != null && arguments.TryGetValue("method", out var mObj))
                 method = mObj?.ToString();
+            if (string.IsNullOrWhiteSpace(method) &&
+                arguments != null &&
+                arguments.TryGetValue("obfuscator_type", out var obfTypeObj))
+            {
+                method = obfTypeObj?.ToString();
+            }
 
             bool renameSymbols = true;
             if (arguments != null && arguments.TryGetValue("rename_symbols", out var rsObj))
