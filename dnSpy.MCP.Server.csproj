@@ -7,6 +7,8 @@
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\dnSpy.snk</AssemblyOriginatorKeyFile>
     <OutputPath>..\..\dnSpy\dnSpy\bin\$(Configuration)\</OutputPath>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <CopyExtensionToRuntimeOutputs Condition="'$(CopyExtensionToRuntimeOutputs)' == ''">true</CopyExtensionToRuntimeOutputs>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
@@ -82,47 +84,37 @@
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
   </ItemGroup>
 
-  <!-- Exclude backup, docs, and Sample directories from implicit SDK compile items -->
   <ItemGroup>
-    <Compile Remove="backup\**\*.cs" />
-    <None Remove="backup\**\*.xaml" />
-    <Compile Remove="docs\**\*.cs" />
-    <None Remove="docs\**\*.xaml" />
-    <Compile Remove="Sample\**\*.cs" />
-    <None Remove="Sample\**\*.xaml" />
-    <Page Remove="Sample\**\*.xaml" />
+    <Compile Include="src\**\*.cs" />
+    <Page Include="src\**\*.xaml" />
   </ItemGroup>
 
-  <!-- Config file deployed alongside the DLL — user edits are preserved on rebuild -->
+  <!-- Config file deployed alongside the DLL - user edits are preserved on rebuild -->
   <ItemGroup>
-    <None Update="mcp-config.json">
+    <None Include="mcp-config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
-  <!-- Source files under src/ are discovered implicitly by the SDK.
-       Avoid explicitly adding <Compile Include="src\**\*.cs" /> to prevent duplicate
-       Compile items (see https://aka.ms/sdkimplicititems). -->
+  <Target Name="CopyNet10ExtensionToRuntimeSpecificDnSpyOutputs" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net10.0-windows' and '$(CopyExtensionToRuntimeOutputs)' == 'true'">
+    <ItemGroup>
+      <Net10RuntimeDirs Include="$(TargetDir)win-x64\" />
+      <Net10RuntimeDirs Include="$(TargetDir)win-x86\" />
+      <Net10RuntimeFiles Include="$(TargetDir)dnSpy.MCP.Server.x.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)dnSpy.MCP.Server.x.pdb" Condition="Exists('$(TargetDir)dnSpy.MCP.Server.x.pdb')" />
+      <Net10RuntimeFiles Include="$(TargetDir)dnSpy.MCP.Server.x.deps.json" />
+      <Net10RuntimeFiles Include="$(TargetDir)mcp-config.json" />
+      <Net10RuntimeFiles Include="$(TargetDir)AssemblyData.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)de4dot.blocks.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)de4dot.code.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)de4dot.cui.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)de4dot.mdecrypt.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)ModelContextProtocol.Core.dll" />
+      <Net10RuntimeFiles Include="$(TargetDir)ModelContextProtocol.dll" />
+    </ItemGroup>
 
-  <!-- Exclude original root copies to avoid duplicate compile errors -->
-  <ItemGroup>
-    <Compile Remove="AssemblyTools.cs" />
-    <Compile Remove="BepInExResources.cs" />
-    <Compile Remove="CodeAnalysisHelpers.cs" />
-    <Compile Remove="McpInteropModels.cs" />
-    <Compile Remove="McpInteropTools.cs" />
-    <Compile Remove="McpOutput.cs" />
-    <Compile Remove="McpProtocol.cs" />
-    <Compile Remove="McpServer.cs" />
-    <Compile Remove="McpSettings.cs" />
-    <Compile Remove="McpSettingsControl.xaml.cs" />
-    <None Remove="McpSettingsControl.xaml" />
-    <Compile Remove="McpSettingsPage.cs" />
-    <Compile Remove="McpTools.cs" />
-    <Compile Remove="TheExtension.cs" />
-    <Compile Remove="ToolbarCommands.cs" />
-    <Compile Remove="TypeTools.cs" />
-    <Compile Remove="UsageFindingCommandTools.cs" />
-  </ItemGroup>
+    <MakeDir Directories="@(Net10RuntimeDirs)" />
+    <Copy SourceFiles="@(Net10RuntimeFiles)" DestinationFolder="%(Net10RuntimeDirs.Identity)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
