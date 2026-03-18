@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module. 
 
@@ -21,12 +22,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
+using dnSpy.Contracts.Scripting;
 using dnSpy.MCP.Server.Presentation;
 using dnSpy.MCP.Server.Application;
 using dnSpy.MCP.Server.Contracts;
@@ -40,7 +43,7 @@ namespace dnSpy.MCP.Server.Communication {
 	[Export(typeof(McpServer))]
 	public sealed class McpServer : IDisposable {
 		readonly McpSettings settings;
-		readonly McpTools tools;
+		readonly IServiceLocator serviceLocator;
 		readonly BepInExResources bepinexResources;
 		HttpListener? httpListener;
 		int actualPort;                // the port actually bound (may differ from settings.Port if port was in use)
@@ -53,6 +56,12 @@ namespace dnSpy.MCP.Server.Communication {
 		static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
 			DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
 		};
+		static readonly HashSet<string> supportedProtocolVersions = new HashSet<string>(StringComparer.Ordinal) {
+			"2024-11-05",
+			"2025-03-26",
+			"2025-06-18",
+			"2025-11-25"
+		};
 
 		// UTF-8 without BOM — SSE clients break on the BOM that Encoding.UTF8 emits
 		static readonly UTF8Encoding utf8NoBom = new UTF8Encoding(false);
@@ -61,9 +70,9 @@ namespace dnSpy.MCP.Server.Communication {
 		/// Initializes the MCP server with the specified settings, tools, and documentation.
 		/// </summary>
 		[ImportingConstructor]
-		public McpServer(McpSettings settings, McpTools tools, BepInExResources bepinexResources) {
+		public McpServer(McpSettings settings, IServiceLocator serviceLocator, BepInExResources bepinexResources) {
 			this.settings = settings;
-			this.tools = tools;
+			this.serviceLocator = serviceLocator;
 			this.bepinexResources = bepinexResources;
 			actualPort = settings.Port;
 		}
@@ -205,6 +214,18 @@ namespace dnSpy.MCP.Server.Communication {
 
 				var path = context.Request.Url?.AbsolutePath ?? "/";
 
+				if (!IsOriginAllowed(context.Request)) {
+					context.Response.StatusCode = 403;
+					WriteJsonResponse(context.Response, new McpResponse {
+						JsonRpc = "2.0",
+						Error = new McpError {
+							Code = -32600,
+							Message = "Forbidden origin"
+						}
+					});
+					return;
+				}
+
 				if (path != "/health" && !IsRequestAuthorized(context.Request)) {
 					context.Response.StatusCode = 401;
 					context.Response.AddHeader("WWW-Authenticate", "Bearer");
@@ -216,8 +237,8 @@ namespace dnSpy.MCP.Server.Communication {
 					return;
 				}
 
-						// SSE stream: GET /sse, /events, or /
-				if (context.Request.HttpMethod == "GET" && (path == "/sse" || path == "/events" || path == "/")) {
+				// Legacy SSE stream: GET /sse or /events
+				if (context.Request.HttpMethod == "GET" && (path == "/sse" || path == "/events")) {
 					McpLogger.Debug($"SSE connection attempt on path: {path}");
 					HandleSseRequest(context);
 					return;
@@ -229,37 +250,36 @@ namespace dnSpy.MCP.Server.Communication {
 					return;
 				}
 
-				if (path == "/health" && context.Request.HttpMethod == "GET") {
-					var healthResponse = "{\"status\":\"ok\",\"service\":\"dnSpy MCP Server\"}";
-					var buffer = Encoding.UTF8.GetBytes(healthResponse);
-					context.Response.ContentType = "application/json";
-					context.Response.ContentLength64 = buffer.Length;
-					context.Response.OutputStream.Write(buffer, 0, buffer.Length);
-					context.Response.Close();
+				if ((path == "/health" || path == "/healthz" || path == "/readyz") && context.Request.HttpMethod == "GET") {
+					WriteJsonResponse(context.Response, new {
+						status = "ok",
+						service = "dnSpy MCP Server",
+						endpoint = "/mcp",
+						legacySseEndpoint = "/sse"
+					});
 					return;
 				}
 
-				if (path == "/" && context.Request.HttpMethod == "POST") {
-					using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
-					var body = reader.ReadToEnd();
+				if (path == "/" && context.Request.HttpMethod == "GET") {
+					WriteJsonResponse(context.Response, new {
+						name = "dnSpy MCP Server",
+						transport = "streamable-http",
+						mcpEndpoint = "/mcp",
+						healthEndpoint = "/health",
+						legacySseEndpoint = "/sse"
+					});
+					return;
+				}
 
-					var request = JsonSerializer.Deserialize<McpRequest>(body);
-					if (request == null) {
-						context.Response.StatusCode = 400;
-						var errorBytes = Encoding.UTF8.GetBytes("Invalid request");
-						context.Response.OutputStream.Write(errorBytes, 0, errorBytes.Length);
-						context.Response.Close();
-						return;
-					}
+				if (path == "/mcp" && context.Request.HttpMethod == "GET") {
+					McpLogger.Debug("MCP streamable HTTP GET connection attempt");
+					HandleSseRequest(context);
+					return;
+				}
 
-					var response = HandleRequest(request);
-					var responseJson = JsonSerializer.Serialize(response, jsonOptions);
-					var responseBytes = Encoding.UTF8.GetBytes(responseJson);
-
-					context.Response.ContentType = "application/json";
-					context.Response.ContentLength64 = responseBytes.Length;
-					context.Response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
-					context.Response.Close();
+				if ((path == "/" || path == "/mcp") && context.Request.HttpMethod == "POST") {
+					HandleJsonRpcRequest(context);
+					return;
 				}
 				else {
 					McpLogger.Warning($"Unhandled request: {context.Request.HttpMethod} {path}");
@@ -300,6 +320,67 @@ namespace dnSpy.MCP.Server.Communication {
 			}
 		}
 
+		void HandleJsonRpcRequest(HttpListenerContext context) {
+			if (!TryGetRequestedProtocolVersion(context.Request, out var protocolVersion, out var protocolError)) {
+				context.Response.StatusCode = 400;
+				WriteJsonResponse(context.Response, new McpResponse {
+					JsonRpc = "2.0",
+					Error = new McpError {
+						Code = -32600,
+						Message = protocolError ?? "Invalid MCP-Protocol-Version header"
+					}
+				});
+				return;
+			}
+
+			using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
+			var body = reader.ReadToEnd();
+			using var document = JsonDocument.Parse(body);
+			var root = document.RootElement;
+
+			if (IsJsonRpcResponse(root)) {
+				context.Response.StatusCode = 202;
+				context.Response.ContentLength64 = 0;
+				context.Response.Close();
+				return;
+			}
+
+			var request = JsonSerializer.Deserialize<McpRequest>(body);
+			if (request == null || string.IsNullOrEmpty(request.Method)) {
+				context.Response.StatusCode = 400;
+				WriteJsonResponse(context.Response, new McpResponse {
+					JsonRpc = "2.0",
+					Error = new McpError {
+						Code = -32600,
+						Message = "Invalid request"
+					}
+				});
+				return;
+			}
+
+			context.Response.Headers["MCP-Protocol-Version"] = protocolVersion;
+
+			if (request.Id == null) {
+				HandleNotification(request);
+				context.Response.StatusCode = 202;
+				context.Response.ContentLength64 = 0;
+				context.Response.Close();
+				return;
+			}
+
+			var response = HandleRequest(request);
+			WriteJsonResponse(context.Response, response);
+		}
+
+		void WriteJsonResponse(HttpListenerResponse response, object payload) {
+			var responseJson = JsonSerializer.Serialize(payload, jsonOptions);
+			var responseBytes = Encoding.UTF8.GetBytes(responseJson);
+			response.ContentType = "application/json";
+			response.ContentLength64 = responseBytes.Length;
+			response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
+			response.Close();
+		}
+
 		bool IsRequestAuthorized(HttpListenerRequest req) {
 			var cfg = Configuration.McpConfig.Instance;
 			if (!cfg.RequireApiKey || string.IsNullOrEmpty(cfg.ApiKey)) return true;
@@ -308,6 +389,35 @@ namespace dnSpy.MCP.Server.Communication {
 			var auth = req.Headers["Authorization"];
 			if (auth != null && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
 				&& auth.Substring(7) == cfg.ApiKey) return true;
+			return false;
+		}
+
+		bool IsOriginAllowed(HttpListenerRequest req) {
+			var origin = req.Headers["Origin"];
+			if (string.IsNullOrWhiteSpace(origin))
+				return true;
+
+			if (!Uri.TryCreate(origin, UriKind.Absolute, out var originUri))
+				return false;
+
+			var originHost = originUri.Host;
+			if (string.Equals(originHost, "localhost", StringComparison.OrdinalIgnoreCase) ||
+			    string.Equals(originHost, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+			    string.Equals(originHost, "::1", StringComparison.OrdinalIgnoreCase))
+				return true;
+
+			var requestHost = req.Url?.Host;
+			if (!string.IsNullOrEmpty(requestHost) &&
+			    string.Equals(originHost, requestHost, StringComparison.OrdinalIgnoreCase))
+				return true;
+
+			var configuredHost = settings.Host;
+			if (!string.IsNullOrEmpty(configuredHost) &&
+			    configuredHost != "*" &&
+			    configuredHost != "0.0.0.0" &&
+			    string.Equals(originHost, configuredHost, StringComparison.OrdinalIgnoreCase))
+				return true;
+
 			return false;
 		}
 
@@ -389,6 +499,7 @@ namespace dnSpy.MCP.Server.Communication {
 				response.SendChunked = true;
 				response.Headers["Cache-Control"] = "no-cache";
 				response.Headers["Connection"] = "keep-alive";
+				response.Headers["MCP-Protocol-Version"] = "2025-03-26";
 
 					McpLogger.Debug("SSE headers sent to client");
 				var sessionId = Guid.NewGuid().ToString("N");
@@ -621,7 +732,7 @@ namespace dnSpy.MCP.Server.Communication {
 				McpLogger.Info($"Handling MCP request: {request.Method}");
 
 				var result = request.Method switch {
-					"initialize" => HandleInitialize(),
+					"initialize" => HandleInitialize(request.Params),
 					"ping" => HandlePing(),
 					"tools/list" => HandleListTools(),
 					"tools/call" => HandleCallTool(request.Params),
@@ -664,9 +775,20 @@ namespace dnSpy.MCP.Server.Communication {
 			}
 		}
 
-		object HandleInitialize() {
+		void HandleNotification(McpRequest request) {
+			if (request.Method.StartsWith("notifications/", StringComparison.Ordinal)) {
+				McpLogger.Debug($"Received notification: {request.Method}");
+				return;
+			}
+
+			McpLogger.Debug($"Received client message without id: {request.Method}");
+		}
+
+		object HandleInitialize(Dictionary<string, object>? parameters) {
+			var protocolVersion = TryGetRequestedProtocolVersion(parameters) ?? "2025-03-26";
+
 			return new InitializeResult {
-				ProtocolVersion = "2024-11-05",
+				ProtocolVersion = protocolVersion,
 				Capabilities = new ServerCapabilities {
 					Tools = new Dictionary<string, object>(),
 					Resources = new Dictionary<string, object>()
@@ -678,12 +800,45 @@ namespace dnSpy.MCP.Server.Communication {
 			};
 		}
 
+		string? TryGetRequestedProtocolVersion(Dictionary<string, object>? parameters) {
+			if (parameters == null)
+				return null;
+
+			if (!parameters.TryGetValue("protocolVersion", out var protocolVersionObj))
+				return null;
+
+			if (protocolVersionObj is System.Text.Json.JsonElement protocolVersionElem &&
+			    protocolVersionElem.ValueKind == System.Text.Json.JsonValueKind.String)
+				return protocolVersionElem.GetString();
+
+			return protocolVersionObj as string;
+		}
+
+		bool TryGetRequestedProtocolVersion(HttpListenerRequest request, out string protocolVersion, out string? error) {
+			protocolVersion = request.Headers["MCP-Protocol-Version"] ?? "2025-03-26";
+			error = null;
+
+			if (!supportedProtocolVersions.Contains(protocolVersion)) {
+				error = $"Unsupported MCP-Protocol-Version: {protocolVersion}";
+				return false;
+			}
+
+			return true;
+		}
+
+		static bool IsJsonRpcResponse(JsonElement root) {
+			return root.ValueKind == JsonValueKind.Object &&
+			       !root.TryGetProperty("method", out _) &&
+			       (root.TryGetProperty("result", out _) || root.TryGetProperty("error", out _));
+		}
+
 		object HandlePing() {
 			// Simple ping/pong for keepalive
 			return new { };
 		}
 
 		object HandleListTools() {
+			var tools = ResolveTools();
 			return new ListToolsResult {
 				Tools = tools.GetAvailableTools()
 			};
@@ -710,7 +865,21 @@ namespace dnSpy.MCP.Server.Communication {
 			    argsElem.ValueKind == System.Text.Json.JsonValueKind.Object)
 				toolArgs = JsonSerializer.Deserialize<Dictionary<string, object>>(argsElem.GetRawText());
 
+			var tools = ResolveTools();
 			return tools.ExecuteTool(toolName, toolArgs);
+		}
+
+		McpTools ResolveTools() {
+			try {
+				var tools = serviceLocator.TryResolve<McpTools>();
+				if (tools != null)
+					return tools;
+			}
+			catch (Exception ex) {
+				McpLogger.Exception(ex, "Failed to resolve McpTools from service locator");
+			}
+
+			throw new InvalidOperationException("McpTools is not available in the current dnSpy composition");
 		}
 
 		object HandleListResources() {

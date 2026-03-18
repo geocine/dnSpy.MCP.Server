@@ -120,7 +120,7 @@ dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Release --no
 2. Verify it is running:
    ```bash
    curl http://localhost:3100/health
-   curl -N --max-time 3 http://localhost:3100/sse   # should print event: endpoint
+   curl http://localhost:3100/mcp
    ```
 3. Configure your MCP client (see next section)
 
@@ -128,15 +128,27 @@ dotnet build Extensions/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj -c Release --no
 
 ## Client Configuration
 
-The server implements the **MCP SSE transport** (spec version 2024-11-05). On connect the server sends an `event: endpoint` with the per-session POST URL; responses are pushed back over the SSE stream.
+The server implements **streamable HTTP MCP** on `POST /mcp`. Legacy SSE endpoints remain available on `/sse` and `/events` for older clients, but `/mcp` is the primary endpoint.
 
-### Claude Code (CLI)
+### Codex CLI
 
 ```bash
-claude mcp add dnspy --transport sse http://localhost:3100/sse
+codex mcp add dnspy --url http://localhost:3100/mcp
 ```
 
-### Claude Desktop
+### Generic streamable HTTP config
+
+```json
+{
+  "mcpServers": {
+    "dnspy": {
+      "url": "http://localhost:3100/mcp"
+    }
+  }
+}
+```
+
+### Legacy SSE clients
 
 ```json
 {
@@ -149,63 +161,7 @@ claude mcp add dnspy --transport sse http://localhost:3100/sse
 }
 ```
 
-### OpenCode
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "dnspy": {
-      "type": "remote",
-      "url": "http://localhost:3100/sse",
-      "enabled": true
-    }
-  }
-}
-```
-
-### Kilo Code / Roo Code
-
-```json
-{
-  "mcpServers": {
-    "dnspy-mcp": {
-      "type": "sse",
-      "url": "http://localhost:3100/sse",
-      "alwaysAllow": [
-        "list_assemblies", "list_tools", "search_types",
-        "get_type_info", "list_methods_in_type"
-      ],
-      "disabled": false
-    }
-  }
-}
-```
-
-### Codex CLI
-
-```json
-{
-  "mcpServers": {
-    "dnspy": {
-      "type": "sse",
-      "url": "http://localhost:3100/sse",
-      "timeout": 30
-    }
-  }
-}
-```
-
-### Gemini CLI
-
-```yaml
-mcpServers:
-  dnspy:
-    type: sse
-    url: http://localhost:3100/sse
-```
-
-> **SSE endpoints**: `GET /sse` (or `/events`, `/`) opens the event stream. The server immediately sends `event: endpoint\ndata: http://localhost:3100/message?sessionId=<id>`. The client then POSTs JSON-RPC requests to that URL and receives responses as `event: message` SSE events. `POST /` still accepts direct JSON-RPC for curl/scripting use.
+> **HTTP endpoints**: `POST /mcp` is the primary MCP endpoint. `GET /health`, `GET /healthz`, and `GET /readyz` return health JSON. `GET /` returns endpoint metadata. Legacy SSE remains available on `GET /sse` / `GET /events`, with `POST /message?sessionId=<id>` for session messages.
 
 ---
 
@@ -928,7 +884,7 @@ A `mcp-config.json` file is created automatically next to the MCP Server DLL on 
 > ```
 > netsh http add urlacl url=http://+:3100/ user=Everyone
 > ```
-> Then point your MCP client at `http://<dnspy-machine-ip>:3100/sse`.
+> Then point your MCP client at `http://<dnspy-machine-ip>:3100/mcp`.
 
 After editing `mcp-config.json`, call `reload_mcp_config` or restart dnSpy to apply the changes.
 
@@ -961,7 +917,7 @@ netstat -ano | findstr :3100
 | `dump_module_from_memory` returns no bytes | Module has no address (pure dynamic) | Some in-memory modules emitted by reflection emit cannot be dumped |
 | Dump `IsFileLayout: false` | Memory layout dump | Use `dump_module_unpacked` instead — it performs the layout fix automatically |
 | `unpack_from_memory` fails with anti-debug error | Process kills itself before EntryPoint | Use `patch_method_to_ret` to neutralize anti-debug methods first, save the patched binary, then retry |
-| `Failed to reconnect` when adding MCP server | Wrong transport type | Use `--transport sse` with Claude Code CLI, not `streamable-http`. URL must point to `/sse` endpoint: `http://localhost:3100/sse` |
+| `Failed to connect` when adding MCP server | Wrong endpoint URL | For Codex and other streamable HTTP clients, use `http://localhost:3100/mcp`. Use `http://localhost:3100/sse` only for legacy SSE clients. |
 | `dump_cordbg_il` returns E_NOINTERFACE errors | COM STA apartment threading | `ICorDebugModule` COM objects belong to the CorDebug engine thread; calling from another STA fails. This is a known limitation — use `dump_module_unpacked` instead for memory dumps. |
 | `Connection refused` from VM / sandbox | `host` is still `"localhost"` | Set `"host": "0.0.0.0"` in `mcp-config.json` and run `netsh http add urlacl url=http://+:3100/ user=Everyone` as Administrator. |
 | `Access denied` when binding to `0.0.0.0` | Missing URL ACL | Run `netsh http add urlacl url=http://+:3100/ user=Everyone` as Administrator (replace `3100` with your configured port). |
