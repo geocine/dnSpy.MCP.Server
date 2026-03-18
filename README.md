@@ -86,31 +86,18 @@ git submodule update --init --recursive
 ### Build commands
 
 ```bash
-# Build only the MCP Server extension (Debug)
-dotnet build dnSpy.MCP.Server.csproj -c Debug
+# Default: repair/build dnSpy, then build the MCP extension for net10.0-windows
+build.bat
 
-# Build only the MCP Server extension (Release)
-dotnet build dnSpy.MCP.Server.csproj -c Release
+# Only repair/build dnSpy and fix known output quirks
+build.bat dnspy
 
-# Optionally build the bundled dnSpy host only
-# Note: dnSpy\dnSpy.sln does not include the repo-root MCP extension project
-dotnet build dnSpy\dnSpy.sln -c Debug
+# Build only the MCP extension for net10.0-windows
+build.bat mcp
 
-# Build only the dnSpy net48 host executable
-dotnet build dnSpy\dnSpy\dnSpy\dnSpy.csproj -c Release -f net48
-
-# Or use the repo-supported dnSpy build script for net48 host artifacts
-powershell -ExecutionPolicy Bypass -File dnSpy\build.ps1 -buildtfm netframework -NoMsbuild
-
-# Build for a specific target framework only
-dotnet build dnSpy.MCP.Server.csproj -c Release -f net10.0-windows
-dotnet build dnSpy.MCP.Server.csproj -c Release -f net48
-
-# Restore NuGet packages without building
-dotnet restore dnSpy.MCP.Server.csproj
-
-# Clean build artifacts
-dotnet clean dnSpy.MCP.Server.csproj
+# Optional advanced modes
+build.bat mcp-net48
+build.bat mcp-all
 ```
 
 ### Output locations
@@ -125,6 +112,8 @@ dotnet clean dnSpy.MCP.Server.csproj
 > **Known `net48` dnSpy host quirk**: some `dnSpy\dnSpy.sln` builds can leave theme files under `dnSpy\dnSpy\dnSpy\bin\Release\net48\bin\Themes\` even though dnSpy startup probes `dnSpy\dnSpy\dnSpy\bin\Release\net48\Themes\`. If startup fails with `ThemeService` / `Sequence contains no elements`, copy the `.dntheme` files into the top-level `Themes` folder before launching `dnSpy.exe`.
 
 > **Known `dnSpy.sln` build pitfall**: avoid forcing `-p:TargetFramework=net48` on `dnSpy\dnSpy.sln`. Some Roslyn helper projects in the solution target `netstandard2.0` and `net10.0-windows`, so a solution-wide `net48` override can fail with `NETSDK1005`. Build the solution without a target-framework override, or build `dnSpy\dnSpy\dnSpy\dnSpy.csproj -f net48` when you only need the .NET Framework host.
+
+> **Build wrapper**: `build.bat` is the only build entry point you need. It skips the submodule reset when `dnSpy/` is already aligned to the pinned commits, repairs it when it is not, builds dnSpy with the supported command, and fixes the `net48\Themes` layout if needed. The default `build.bat` path then builds the MCP extension for `net10.0-windows`.
 
 ### Verify the build
 
