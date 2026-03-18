@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module.
 
@@ -87,9 +88,9 @@ namespace dnSpy.MCP.Server.Application
             return sb.ToString();
         }
 
-        // Collect all child buttons of a Win32 dialog
         static List<(IntPtr hwnd, string text)> GetButtons(IntPtr parent)
         {
+            // Collect all child buttons of a Win32 dialog.
             var buttons = new List<(IntPtr, string)>();
             EnumChildWindows(parent, (child, _) =>
             {
@@ -100,33 +101,31 @@ namespace dnSpy.MCP.Server.Application
             return buttons;
         }
 
-        // Collect "Static" child texts (message body) of a Win32 dialog
         static string GetDialogMessage(IntPtr parent)
         {
+            // Collect "Static" child texts for the dialog body.
             var parts = new List<string>();
             EnumChildWindows(parent, (child, _) =>
             {
                 if (GetWndClass(child).Equals("Static", StringComparison.OrdinalIgnoreCase))
                 {
-                    string t = GetWndText(child).Trim();
-                    if (t.Length > 0)
-                        parts.Add(t);
+                    string text = GetWndText(child).Trim();
+                    if (text.Length > 0)
+                        parts.Add(text);
                 }
                 return true;
             }, IntPtr.Zero);
             return string.Join(" | ", parts);
         }
 
-        // ── Dialog descriptor ─────────────────────────────────────────────────
-
         sealed class DialogInfo
         {
-            public IntPtr Hwnd;          // IntPtr.Zero for pure-WPF dialogs
+            public IntPtr Hwnd; // IntPtr.Zero for pure-WPF dialogs
             public string Title = "";
             public string Message = "";
             public List<string> Buttons = new List<string>();
             public bool IsWpf;
-            public Window? WpfWindow;    // only for WPF dialogs
+            public Window? WpfWindow; // Only for WPF dialogs
         }
 
         List<DialogInfo> CollectDialogs()
@@ -138,64 +137,80 @@ namespace dnSpy.MCP.Server.Application
             WpfApp.Current.Dispatcher.Invoke(() =>
             {
                 Window? mainWin = WpfApp.Current.MainWindow;
-                foreach (Window w in WpfApp.Current.Windows)
+                foreach (Window window in WpfApp.Current.Windows)
                 {
-                    if (!w.IsVisible || w == mainWin)
+                    if (!window.IsVisible || window == mainWin)
                         continue;
 
-                    var di = new DialogInfo
+                    var dialog = new DialogInfo
                     {
                         IsWpf = true,
-                        WpfWindow = w,
-                        Title = w.Title ?? "",
+                        WpfWindow = window,
+                        Title = window.Title ?? "",
                         // WPF MessageBox wraps a Win32 dialog; collect buttons below.
                         Message = "",
                         Buttons = new List<string>()
                     };
 
-                    // Try to get underlying HWND (may or may not exist for WPF MessageBox)
+                    // Try to get the underlying HWND, which may not exist for pure WPF windows.
                     try
                     {
-                        var interop = new System.Windows.Interop.WindowInteropHelper(w);
-                        IntPtr h = interop.Handle;
-                        if (h != IntPtr.Zero && IsWindow(h))
+                        var interop = new System.Windows.Interop.WindowInteropHelper(window);
+                        IntPtr hwnd = interop.Handle;
+                        if (hwnd != IntPtr.Zero && IsWindow(hwnd))
                         {
-                            di.Hwnd = h;
-                            di.Message = GetDialogMessage(h);
-                            foreach (var (_, txt) in GetButtons(h))
-                                if (txt.Length > 0) di.Buttons.Add(txt);
+                            dialog.Hwnd = hwnd;
+                            dialog.Message = GetDialogMessage(hwnd);
+                            foreach (var (_, text) in GetButtons(hwnd))
+                            {
+                                if (text.Length > 0)
+                                    dialog.Buttons.Add(text);
+                            }
                         }
                     }
-                    catch { /* ignore */ }
+                    catch {
+                        // Ignore transient interop failures while probing dialog metadata.
+                    }
 
-                    result.Add(di);
+                    result.Add(dialog);
                 }
             });
 
             // B) Win32 dialogs (class #32770) owned by this process
             var seenHwnds = new HashSet<IntPtr>();
-            foreach (var d in result)
-                if (d.Hwnd != IntPtr.Zero) seenHwnds.Add(d.Hwnd);
+            foreach (var dialog in result)
+            {
+                if (dialog.Hwnd != IntPtr.Zero)
+                    seenHwnds.Add(dialog.Hwnd);
+            }
 
             EnumWindows((hwnd, _) =>
             {
-                if (!IsWindowVisible(hwnd)) return true;
-                GetWindowThreadProcessId(hwnd, out uint pid);
-                if (pid != currentPid) return true;
-                if (!GetWndClass(hwnd).Equals("#32770", StringComparison.Ordinal)) return true;
-                if (seenHwnds.Contains(hwnd)) return true;
+                if (!IsWindowVisible(hwnd))
+                    return true;
 
-                var di = new DialogInfo
+                GetWindowThreadProcessId(hwnd, out uint pid);
+                if (pid != currentPid)
+                    return true;
+                if (!GetWndClass(hwnd).Equals("#32770", StringComparison.Ordinal))
+                    return true;
+                if (seenHwnds.Contains(hwnd))
+                    return true;
+
+                var dialog = new DialogInfo
                 {
                     IsWpf = false,
                     Hwnd = hwnd,
                     Title = GetWndText(hwnd),
                     Message = GetDialogMessage(hwnd)
                 };
-                foreach (var (_, txt) in GetButtons(hwnd))
-                    if (txt.Length > 0) di.Buttons.Add(txt);
+                foreach (var (_, text) in GetButtons(hwnd))
+                {
+                    if (text.Length > 0)
+                        dialog.Buttons.Add(text);
+                }
 
-                result.Add(di);
+                result.Add(dialog);
                 return true;
             }, IntPtr.Zero);
 
@@ -208,23 +223,25 @@ namespace dnSpy.MCP.Server.Application
         {
             var dialogs = CollectDialogs();
             if (dialogs.Count == 0)
-                return "No hay diálogos activos.";
+                return "No active dialogs.";
 
             var sb = new StringBuilder();
             for (int i = 0; i < dialogs.Count; i++)
             {
-                var d = dialogs[i];
-                sb.AppendLine($"[{i + 1}] Title: \"{d.Title}\"");
-                if (d.Hwnd != IntPtr.Zero)
-                    sb.AppendLine($"    Hwnd: {d.Hwnd.ToInt64():X}  |  Type: {(d.IsWpf ? "WPF" : "Win32 (#32770)")}");
+                var dialog = dialogs[i];
+                sb.AppendLine($"[{i + 1}] Title: \"{dialog.Title}\"");
+                if (dialog.Hwnd != IntPtr.Zero)
+                    sb.AppendLine($"    Hwnd: {dialog.Hwnd.ToInt64():X}  |  Type: {(dialog.IsWpf ? "WPF" : "Win32 (#32770)")}");
                 else
-                    sb.AppendLine($"    Type: WPF (no HWND)");
-                if (!string.IsNullOrWhiteSpace(d.Message))
-                    sb.AppendLine($"    Message: \"{d.Message}\"");
-                if (d.Buttons.Count > 0)
-                    sb.AppendLine($"    Buttons: {string.Join(", ", d.Buttons)}");
+                    sb.AppendLine("    Type: WPF (no HWND)");
+
+                if (!string.IsNullOrWhiteSpace(dialog.Message))
+                    sb.AppendLine($"    Message: \"{dialog.Message}\"");
+                if (dialog.Buttons.Count > 0)
+                    sb.AppendLine($"    Buttons: {string.Join(", ", dialog.Buttons)}");
                 sb.AppendLine();
             }
+
             return sb.ToString().TrimEnd();
         }
 
@@ -232,7 +249,7 @@ namespace dnSpy.MCP.Server.Application
         {
             args ??= new Dictionary<string, object>();
 
-            // Parse optional hwnd
+            // Parse optional hwnd.
             IntPtr targetHwnd = IntPtr.Zero;
             if (args.TryGetValue("hwnd", out object? hwndObj) && hwndObj is not null)
             {
@@ -240,11 +257,11 @@ namespace dnSpy.MCP.Server.Application
                 hwndStr = hwndStr.Trim();
                 if (hwndStr.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                     hwndStr = hwndStr.Substring(2);
-                if (long.TryParse(hwndStr, System.Globalization.NumberStyles.HexNumber, null, out long hv))
-                    targetHwnd = new IntPtr(hv);
+                if (long.TryParse(hwndStr, System.Globalization.NumberStyles.HexNumber, null, out long value))
+                    targetHwnd = new IntPtr(value);
             }
 
-            // Parse optional button preference
+            // Parse optional button preference.
             string buttonPref = "ok";
             if (args.TryGetValue("button", out object? btnObj) && btnObj is not null)
             {
@@ -255,28 +272,35 @@ namespace dnSpy.MCP.Server.Application
 
             var dialogs = CollectDialogs();
             if (dialogs.Count == 0)
-                return "No hay diálogos activos.";
+                return "No active dialogs.";
 
-            // Resolve target dialog
+            // Resolve target dialog.
             DialogInfo? target = null;
             if (targetHwnd != IntPtr.Zero)
             {
-                foreach (var d in dialogs)
-                    if (d.Hwnd == targetHwnd) { target = d; break; }
+                foreach (var dialog in dialogs)
+                {
+                    if (dialog.Hwnd == targetHwnd)
+                    {
+                        target = dialog;
+                        break;
+                    }
+                }
+
                 if (target == null)
-                    return $"Error: no se encontró un diálogo con HWND {targetHwnd.ToInt64():X}.";
+                    return $"Error: dialog with HWND {targetHwnd.ToInt64():X} was not found.";
             }
             else
             {
                 target = dialogs[0];
             }
 
-            // Click matching button on Win32 dialog
             if (target.Hwnd != IntPtr.Zero)
             {
                 if (!IsWindow(target.Hwnd))
                     return $"Error: HWND {target.Hwnd.ToInt64():X} is no longer valid (window already closed).";
 
+                // Click a matching button on a Win32 dialog if one exists.
                 var buttons = GetButtons(target.Hwnd);
                 IntPtr matchedBtn = IntPtr.Zero;
                 string matchedText = "";
@@ -297,19 +321,19 @@ namespace dnSpy.MCP.Server.Application
                     return $"Clicked '{matchedText}' in dialog '{target.Title}'.";
                 }
 
-                // Fallback: close the window
+                // Fallback: close the window when no button matched.
                 PostMessage(target.Hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
                 return $"No matching button for '{buttonPref}' found; sent WM_CLOSE to dialog '{target.Title}'.";
             }
 
-            // Pure WPF window without HWND — close via Dispatcher
+            // Pure WPF window without HWND: close via Dispatcher.
             if (target.WpfWindow != null)
             {
                 WpfApp.Current.Dispatcher.Invoke(() => target.WpfWindow.Close());
                 return $"Closed WPF dialog '{target.Title}'.";
             }
 
-            return "Error: el diálogo no tiene HWND ni referencia WPF.";
+            return "Error: dialog has neither an HWND nor a WPF window reference.";
         }
 
         // ── Button matching ───────────────────────────────────────────────────
@@ -321,28 +345,22 @@ namespace dnSpy.MCP.Server.Application
             {
                 case "ok":
                 case "accept":
-                case "aceptar":
-                    return lower == "ok" || lower == "aceptar" || lower == "accept";
+                    return lower == "ok" || lower == "accept";
 
                 case "yes":
-                case "sí":
-                case "si":
-                    return lower == "yes" || lower == "sí" || lower == "si";
+                    return lower == "yes";
 
                 case "no":
                     return lower == "no";
 
                 case "cancel":
-                case "cancelar":
-                    return lower == "cancel" || lower == "cancelar";
+                    return lower == "cancel";
 
                 case "retry":
-                case "reintentar":
-                    return lower == "retry" || lower == "reintentar";
+                    return lower == "retry";
 
                 case "ignore":
-                case "omitir":
-                    return lower == "ignore" || lower == "omitir";
+                    return lower == "ignore";
 
                 default:
                     return lower.Contains(pref);
