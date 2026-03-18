@@ -44,3 +44,5 @@ Thumbs.db
 AGENTS.md
 .agent/
 Sample/
+.nuke/temp/
+.nuke/build.schema.json

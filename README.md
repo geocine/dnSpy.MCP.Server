@@ -86,7 +86,7 @@ git submodule update --init --recursive
 ### Build commands
 
 ```bash
-# Default: repair/build dnSpy, then build the MCP extension for net10.0-windows
+# Default: repair/build dnSpy, fix known output quirks, then build the MCP extension for net10.0-windows
 build.bat
 
 # Only repair/build dnSpy and fix known output quirks
@@ -98,6 +98,12 @@ build.bat mcp
 # Optional advanced modes
 build.bat mcp-net48
 build.bat mcp-all
+
+# Show wrapper usage
+build.bat --help
+
+# Pass raw arguments through to the underlying NUKE build
+build.bat nuke --target McpNet10 --verbosity verbose
 ```
 
 ### Output locations
@@ -113,7 +119,7 @@ build.bat mcp-all
 
 > **Known `dnSpy.sln` build pitfall**: avoid forcing `-p:TargetFramework=net48` on `dnSpy\dnSpy.sln`. Some Roslyn helper projects in the solution target `netstandard2.0` and `net10.0-windows`, so a solution-wide `net48` override can fail with `NETSDK1005`. Build the solution without a target-framework override, or build `dnSpy\dnSpy\dnSpy\dnSpy.csproj -f net48` when you only need the .NET Framework host.
 
-> **Build wrapper**: `build.bat` is the only build entry point you need. It skips the submodule reset when `dnSpy/` is already aligned to the pinned commits, repairs it when it is not, builds dnSpy with the supported command, and fixes the `net48\Themes` layout if needed. The default `build.bat` path then builds the MCP extension for `net10.0-windows`.
+> **Build wrapper**: `build.bat` is the only build entry point you need. It is NUKE-powered, skips the submodule reset when `dnSpy/` is already aligned to the pinned commits, repairs it when it is not, builds dnSpy with the supported command, and fixes the `net48\Themes` layout if needed. The default `build.bat` path then builds the MCP extension for `net10.0-windows`.
 
 ### Verify the build
 
