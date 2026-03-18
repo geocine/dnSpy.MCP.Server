@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module.
 
@@ -26,6 +27,7 @@ using System.Text;
 using System.Text.Json;
 using dnlib.DotNet;
 using dnSpy.Contracts.Decompiler;
+using dnSpy.Contracts.Scripting;
 using dnSpy.Contracts.Documents.Tabs.DocViewer;
 using dnSpy.Contracts.Documents.TreeView;
 using dnSpy.Contracts.Text;
@@ -38,8 +40,8 @@ namespace dnSpy.MCP.Server.Application
     [Export(typeof(McpTools))]
     public sealed partial class McpTools
     {
+        readonly IServiceLocator serviceLocator;
         readonly IDocumentTreeView documentTreeView;
-        readonly IDecompilerService decompilerService;
         readonly Lazy<AssemblyTools> assemblyTools;
         readonly Lazy<TypeTools> typeTools;
         readonly Lazy<EditTools> editTools;
@@ -55,42 +57,93 @@ namespace dnSpy.MCP.Server.Application
         readonly Lazy<WindowTools> windowTools;
 
         [ImportingConstructor]
-        public McpTools(
-            IDocumentTreeView documentTreeView,
-            IDecompilerService decompilerService,
-            Lazy<AssemblyTools> assemblyTools,
-            Lazy<TypeTools> typeTools,
-            Lazy<EditTools> editTools,
-            Lazy<DebugTools> debugTools,
-            Lazy<DumpTools> dumpTools,
-            Lazy<MemoryInspectTools> memoryInspectTools,
-            Lazy<UsageFindingCommandTools> usageFindingTools,
-            Lazy<CodeAnalysisHelpers> codeAnalysisTools,
-            Lazy<De4dotExeTool> de4dotExeTool,
-            Lazy<De4dotTools> de4dotTools,
-            Lazy<SkillsTools> skillsTools,
-            Lazy<ScriptTools> scriptTools,
-            Lazy<WindowTools> windowTools
-            )
+        public McpTools(IServiceLocator serviceLocator)
         {
-            this.documentTreeView = documentTreeView;
-            this.decompilerService = decompilerService;
-            this.assemblyTools = assemblyTools;
-            this.typeTools = typeTools;
-            this.editTools = editTools;
-            this.debugTools = debugTools;
-            this.dumpTools = dumpTools;
-            this.memoryInspectTools = memoryInspectTools;
-            this.usageFindingTools = usageFindingTools;
-            this.codeAnalysisTools = codeAnalysisTools;
-            this.de4dotExeTool = de4dotExeTool;
-            this.de4dotTools = de4dotTools;
-            this.skillsTools = skillsTools;
-            this.scriptTools = scriptTools;
-            this.windowTools = windowTools;
+            this.serviceLocator = serviceLocator;
+            this.documentTreeView = serviceLocator.Resolve<IDocumentTreeView>();
+            this.assemblyTools = CreateLazy<AssemblyTools>();
+            this.typeTools = CreateLazy<TypeTools>();
+            this.editTools = CreateLazy<EditTools>();
+            this.debugTools = CreateLazy<DebugTools>();
+            this.dumpTools = CreateLazy<DumpTools>();
+            this.memoryInspectTools = CreateLazy<MemoryInspectTools>();
+            this.usageFindingTools = CreateLazy<UsageFindingCommandTools>();
+            this.codeAnalysisTools = CreateLazy<CodeAnalysisHelpers>();
+            this.de4dotExeTool = CreateLazy<De4dotExeTool>();
+            this.de4dotTools = CreateLazy<De4dotTools>();
+            this.skillsTools = CreateLazy<SkillsTools>();
+            this.scriptTools = CreateLazy<ScriptTools>();
+            this.windowTools = CreateLazy<WindowTools>();
         }
 
         // GetAvailableTools() is defined in McpTools.Schemas.cs (partial class)
+
+        Lazy<T> CreateLazy<T>() where T : class =>
+            new Lazy<T>(() => ResolveRequired<T>());
+
+        T ResolveRequired<T>() where T : class {
+            var service = serviceLocator.TryResolve<T>();
+            if (service != null)
+                return service;
+
+            throw new InvalidOperationException($"{typeof(T).Name} is not available in the current dnSpy composition");
+        }
+
+        internal bool CanResolve<T>() where T : class => serviceLocator.TryResolve<T>() != null;
+
+        internal bool IsToolCallable(string toolName) => toolName switch {
+            "list_assemblies" or "select_assembly" or "close_assembly" or "close_all_assemblies" or
+            "get_assembly_info" or "list_types" or "list_native_modules" or "scan_pe_strings" or
+            "load_assembly" => CanResolve<AssemblyTools>(),
+
+            "get_type_info" or "decompile_method" or "list_methods_in_type" or "search_methods" or "list_properties_in_type" or
+            "get_method_signature" or "get_method_il" or "get_method_il_bytes" or
+            "get_method_exception_handlers" or "get_type_fields" or "get_type_property" or
+            "find_path_to_type" => CanResolve<TypeTools>(),
+
+            "decompile_type" or "change_member_visibility" or "rename_member" or "rename_method" or "save_assembly" or
+            "get_assembly_metadata" or "edit_assembly_metadata" or "list_assembly_attributes" or
+            "remove_assembly_attribute" or "set_assembly_flags" or "list_assembly_references" or
+            "add_assembly_reference" or "remove_assembly_reference" or "list_resources" or
+            "get_resource" or "add_resource" or "remove_resource" or "extract_costura" or
+            "inject_type_from_dll" or "list_pinvoke_methods" or "patch_method_to_ret" or
+            "list_events_in_type" or "get_custom_attributes" or "list_nested_types" => CanResolve<EditTools>(),
+
+            "list_runtime_modules" or "dump_module_from_memory" or "read_process_memory" or
+            "write_process_memory" or "get_pe_sections" or "dump_pe_section" or
+            "dump_module_unpacked" or "dump_memory_to_file" or "unpack_from_memory" or
+            "dump_cordbg_il" => CanResolve<DumpTools>(),
+
+            "get_local_variables" or "eval_expression" => CanResolve<MemoryInspectTools>(),
+
+            "find_who_uses_type" or "find_who_reads_field" or "find_who_writes_field" =>
+                CanResolve<UsageFindingCommandTools>(),
+
+            "analyze_call_graph" or "find_dependency_chain" or "analyze_cross_assembly_dependencies" or
+            "find_dead_code" => CanResolve<CodeAnalysisHelpers>(),
+
+            "start_debugging" or "attach_to_process" or "get_debugger_state" or "list_breakpoints" or
+            "set_breakpoint" or "remove_breakpoint" or "clear_all_breakpoints" or "continue_debugger" or
+            "break_debugger" or "stop_debugging" or "get_call_stack" or "step_over" or
+            "step_into" or "step_out" or "get_current_location" or "wait_for_pause" or
+            "set_exception_breakpoint" or "remove_exception_breakpoint" or
+            "list_exception_breakpoints" => CanResolve<DebugTools>(),
+
+            "run_de4dot" => CanResolve<De4dotExeTool>(),
+            "list_deobfuscators" or "detect_obfuscator" or "deobfuscate_assembly" or
+            "save_deobfuscated" => CanResolve<De4dotTools>(),
+
+            "list_skills" or "get_skill" or "save_skill" or "search_skills" or
+            "delete_skill" => CanResolve<SkillsTools>(),
+
+            "run_script" => CanResolve<ScriptTools>(),
+            "list_dialogs" or "close_dialog" => CanResolve<WindowTools>(),
+
+            "search_types" or "find_who_calls_method" or "analyze_type_inheritance" or
+            "list_tools" or "get_mcp_config" or "reload_mcp_config" => true,
+
+            _ => true
+        };
 
         public CallToolResult ExecuteTool(string toolName, Dictionary<string, object>? arguments)
         {
@@ -110,6 +163,7 @@ namespace dnSpy.MCP.Server.Application
                     "get_type_info" => InvokeLazy(typeTools, "GetTypeInfo", arguments),
                     "decompile_method" => InvokeLazy(typeTools, "DecompileMethod", arguments),
                     "list_methods_in_type" => InvokeLazy(typeTools, "ListMethodsInType", arguments),
+                    "search_methods" => InvokeLazy(typeTools, "SearchMethods", arguments),
                     "list_properties_in_type" => InvokeLazy(typeTools, "ListPropertiesInType", arguments),
                     "get_method_signature" => InvokeLazy(typeTools, "GetMethodSignature", arguments),
                     "search_types" => SearchTypes(arguments),
@@ -123,6 +177,7 @@ namespace dnSpy.MCP.Server.Application
                     "decompile_type" => InvokeLazy(editTools, "DecompileType", arguments),
                     "change_member_visibility" => InvokeLazy(editTools, "ChangeVisibility", arguments),
                     "rename_member" => InvokeLazy(editTools, "RenameMember", arguments),
+                    "rename_method" => InvokeLazy(editTools, "RenameMethod", arguments),
                     "save_assembly" => InvokeLazy(editTools, "SaveAssembly", arguments),
                     "get_assembly_metadata" => InvokeLazy(editTools, "GetAssemblyMetadata", arguments),
                     "edit_assembly_metadata" => InvokeLazy(editTools, "EditAssemblyMetadata", arguments),
@@ -352,9 +407,10 @@ namespace dnSpy.MCP.Server.Application
 
         dnlib.DotNet.AssemblyDef? FindAssemblyByName(string name)
         {
-            return documentTreeView.GetAllModuleNodes()
-                .Select(m => m.Document?.AssemblyDef)
-                .FirstOrDefault(a => a?.Name.String.Equals(name, StringComparison.OrdinalIgnoreCase) == true);
+            return UiThreadHelper.Invoke(() =>
+                documentTreeView.GetAllModuleNodes()
+                    .Select(m => m.Document?.AssemblyDef)
+                    .FirstOrDefault(a => a?.Name.String.Equals(name, StringComparison.OrdinalIgnoreCase) == true));
         }
 
         dnlib.DotNet.TypeDef? FindTypeInAssembly(dnlib.DotNet.AssemblyDef assembly, string typeFullName)
@@ -374,17 +430,17 @@ namespace dnSpy.MCP.Server.Application
 
             var (offset, pageSize) = DecodeCursor(cursor);
 
-            bool hasWildcard = query.Contains("*");
-            System.Text.RegularExpressions.Regex? regex = null;
+            bool hasPattern = query.IndexOfAny(new[] { '*', '?', '^', '$', '[', '(', '|', '+', '{' }) >= 0;
+            System.Text.RegularExpressions.Regex? regex = hasPattern ? BuildPatternRegex(query) : null;
 
-            if (hasWildcard)
-            {
-                var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(query).Replace("\\*", ".*") + "$";
-                regex = new System.Text.RegularExpressions.Regex(regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            }
+            var assemblies = UiThreadHelper.Invoke(() =>
+                documentTreeView.GetAllModuleNodes()
+                    .Select(m => m.Document?.AssemblyDef)
+                    .Where(a => a != null)
+                    .ToList());
 
-            var results = documentTreeView.GetAllModuleNodes()
-                .SelectMany(m => m.Document?.AssemblyDef != null ? m.Document.AssemblyDef.Modules.SelectMany(mod => mod.Types) : Enumerable.Empty<dnlib.DotNet.TypeDef>())
+            var results = assemblies
+                .SelectMany(a => a!.Modules.SelectMany(mod => GetAllTypesRecursive(mod.Types)))
                 .Where(t => {
                     if (regex != null)
                         return regex.IsMatch(t.FullName);
@@ -400,6 +456,16 @@ namespace dnSpy.MCP.Server.Application
                 .ToList();
 
             return CreatePaginatedJsonResponse(results, offset, pageSize);
+        }
+
+        static IEnumerable<dnlib.DotNet.TypeDef> GetAllTypesRecursive(IEnumerable<dnlib.DotNet.TypeDef> types)
+        {
+            foreach (var type in types)
+            {
+                yield return type;
+                foreach (var nested in GetAllTypesRecursive(type.NestedTypes))
+                    yield return nested;
+            }
         }
 
         CallToolResult FindWhoCallsMethod(Dictionary<string, object>? arguments)
@@ -534,6 +600,26 @@ namespace dnSpy.MCP.Server.Application
         static string EncodeCursor(int offset, int pageSize)
         {
             return System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{offset}:{pageSize}"));
+        }
+
+        static System.Text.RegularExpressions.Regex BuildPatternRegex(string pattern)
+        {
+            bool isRegex = pattern.IndexOfAny(new[] { '^', '$', '[', '(', '|', '+', '{' }) >= 0;
+            if (isRegex)
+            {
+                return new System.Text.RegularExpressions.Regex(
+                    pattern,
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            }
+
+            var escaped = System.Text.RegularExpressions.Regex.Escape(pattern)
+                .Replace(@"\*", ".*")
+                .Replace(@"\?", ".");
+            return new System.Text.RegularExpressions.Regex(
+                "^" + escaped + "$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         }
 
         static CallToolResult CreatePaginatedJsonResponse<T>(List<T> items, int offset, int pageSize)

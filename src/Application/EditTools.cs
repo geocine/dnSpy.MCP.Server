@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module. 
 
@@ -31,6 +32,7 @@ using dnlib.DotNet.Writer;
 using dnSpy.Contracts.Decompiler;
 using dnSpy.Contracts.Documents.TreeView;
 using dnSpy.MCP.Server.Contracts;
+using dnSpy.MCP.Server.Helper;
 
 namespace dnSpy.MCP.Server.Application {
 	/// <summary>
@@ -269,6 +271,84 @@ namespace dnSpy.MCP.Server.Application {
 
 			return new CallToolResult {
 				Content = new List<ToolContent> { new ToolContent { Text = result + "\nNote: Changes are in-memory. Use save_assembly to persist to disk." } }
+			};
+		}
+
+		/// <summary>
+		/// Renames a method using its declaring type and optional metadata token.
+		/// Arguments: assembly_name, type_full_name, method_name, new_name, method_token (optional)
+		/// If method_token is omitted and multiple overloads exist, the call fails with a token list.
+		/// Changes are in-memory until save_assembly is called.
+		/// </summary>
+		public CallToolResult RenameMethod(Dictionary<string, object>? arguments) {
+			if (arguments == null)
+				throw new ArgumentException("Arguments required");
+			if (!arguments.TryGetValue("assembly_name", out var asmNameObj))
+				throw new ArgumentException("assembly_name is required");
+			if (!arguments.TryGetValue("type_full_name", out var typeNameObj))
+				throw new ArgumentException("type_full_name is required");
+			if (!arguments.TryGetValue("method_name", out var methodNameObj))
+				throw new ArgumentException("method_name is required");
+			if (!arguments.TryGetValue("new_name", out var newNameObj))
+				throw new ArgumentException("new_name is required");
+
+			arguments.TryGetValue("method_token", out var methodTokenObj);
+
+			var assemblyName = asmNameObj.ToString() ?? "";
+			var typeFullName = typeNameObj.ToString() ?? "";
+			var methodName = methodNameObj.ToString() ?? "";
+			var newName = newNameObj.ToString() ?? "";
+
+			if (string.IsNullOrWhiteSpace(newName))
+				throw new ArgumentException("new_name cannot be empty");
+
+			var assembly = FindAssemblyByName(assemblyName);
+			if (assembly == null)
+				throw new ArgumentException($"Assembly not found: {assemblyName}");
+
+			var type = FindTypeInAssemblyAll(assembly, typeFullName);
+			if (type == null)
+				throw new ArgumentException($"Type not found: {typeFullName}");
+
+			MethodDef? method = null;
+
+			if (methodTokenObj != null) {
+				var tokenStr = methodTokenObj is System.Text.Json.JsonElement tokenEl
+					? (tokenEl.ValueKind == System.Text.Json.JsonValueKind.String ? tokenEl.GetString() ?? "" : tokenEl.GetRawText())
+					: (methodTokenObj.ToString() ?? "");
+				uint token = ParseToken(tokenStr);
+				if (token != 0)
+					method = type.Methods.FirstOrDefault(m => m.MDToken.Raw == token);
+				if (method == null)
+					throw new ArgumentException($"No method with token '{tokenStr}' found in '{typeFullName}'");
+			}
+
+			if (method == null) {
+				var matches = type.Methods.Where(m => m.Name.String == methodName).ToList();
+				if (matches.Count == 0)
+					throw new ArgumentException($"Method '{methodName}' not found in type '{typeFullName}'");
+				if (matches.Count > 1)
+					throw new ArgumentException(
+						$"Method '{methodName}' is ambiguous ({matches.Count} overloads in '{typeFullName}'). " +
+						$"Use method_token to disambiguate. Tokens: {string.Join(", ", matches.Select(m => $"0x{m.MDToken.Raw:X8}"))}");
+				method = matches[0];
+			}
+
+			var oldName = method.Name.String;
+			method.Name = newName;
+
+			var result = JsonSerializer.Serialize(new {
+				Renamed = true,
+				TypeFullName = type.FullName,
+				OldName = oldName,
+				NewName = newName,
+				MethodToken = $"0x{method.MDToken.Raw:X8}",
+				Signature = method.FullName,
+				Note = "Method name updated in memory. Use save_assembly to persist to disk."
+			}, new JsonSerializerOptions { WriteIndented = true });
+
+			return new CallToolResult {
+				Content = new List<ToolContent> { new ToolContent { Text = result } }
 			};
 		}
 
@@ -1803,16 +1883,20 @@ namespace dnSpy.MCP.Server.Application {
 		};
 
 		AssemblyDef? FindAssemblyByName(string name, string? filePath = null) {
-			if (!string.IsNullOrEmpty(filePath)) {
-				var normalized = filePath!.Replace('/', '\\');
-				var byPath = documentTreeView.GetAllModuleNodes()
-					.FirstOrDefault(m => (m.Document?.Filename ?? "").Replace('/', '\\')
-						.Equals(normalized, StringComparison.OrdinalIgnoreCase));
-				if (byPath?.Document?.AssemblyDef != null) return byPath.Document.AssemblyDef;
-			}
-			return documentTreeView.GetAllModuleNodes()
-				.Select(m => m.Document?.AssemblyDef)
-				.FirstOrDefault(a => a != null && a.Name.String.Equals(name, StringComparison.OrdinalIgnoreCase));
+			return UiThreadHelper.Invoke(() => {
+				if (!string.IsNullOrEmpty(filePath)) {
+					var normalized = filePath!.Replace('/', '\\');
+					var byPath = documentTreeView.GetAllModuleNodes()
+						.FirstOrDefault(m => (m.Document?.Filename ?? "").Replace('/', '\\')
+							.Equals(normalized, StringComparison.OrdinalIgnoreCase));
+					if (byPath?.Document?.AssemblyDef != null)
+						return byPath.Document.AssemblyDef;
+				}
+
+				return documentTreeView.GetAllModuleNodes()
+					.Select(m => m.Document?.AssemblyDef)
+					.FirstOrDefault(a => a != null && a.Name.String.Equals(name, StringComparison.OrdinalIgnoreCase));
+			});
 		}
 
 		TypeDef? FindTypeInAssembly(AssemblyDef assembly, string fullName) =>

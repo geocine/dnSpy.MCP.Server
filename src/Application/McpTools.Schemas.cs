@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module.
 
@@ -18,6 +19,7 @@
 */
 
 using System.Collections.Generic;
+using System.Linq;
 using dnSpy.MCP.Server.Contracts;
 
 namespace dnSpy.MCP.Server.Application
@@ -28,20 +30,33 @@ namespace dnSpy.MCP.Server.Application
         public List<ToolInfo> GetAvailableTools()
         {
             var tools = new List<ToolInfo>();
-            tools.AddRange(GetAssemblyToolSchemas());
-            tools.AddRange(GetTypeToolSchemas());
-            tools.AddRange(GetMethodILToolSchemas());
-            tools.AddRange(GetAnalysisToolSchemas());
-            tools.AddRange(GetEditToolSchemas());
-            tools.AddRange(GetResourceToolSchemas());
-            tools.AddRange(GetDebugToolSchemas());
-            tools.AddRange(GetMemoryToolSchemas());
-            tools.AddRange(GetDeobfuscationToolSchemas());
-            tools.AddRange(GetSkillsToolSchemas());
-            tools.AddRange(GetScriptingToolSchemas());
-            tools.AddRange(GetWindowToolSchemas());
+
+            if (CanResolve<AssemblyTools>())
+                tools.AddRange(GetAssemblyToolSchemas());
+            if (CanResolve<TypeTools>()) {
+                tools.AddRange(GetTypeToolSchemas());
+                tools.AddRange(GetMethodILToolSchemas());
+            }
+            if (CanResolve<UsageFindingCommandTools>() || CanResolve<CodeAnalysisHelpers>())
+                tools.AddRange(GetAnalysisToolSchemas());
+            if (CanResolve<EditTools>()) {
+                tools.AddRange(GetEditToolSchemas());
+                tools.AddRange(GetResourceToolSchemas());
+            }
+            if (CanResolve<DebugTools>())
+                tools.AddRange(GetDebugToolSchemas());
+            if (CanResolve<MemoryInspectTools>() || CanResolve<DumpTools>())
+                tools.AddRange(GetMemoryToolSchemas());
+            if (CanResolve<De4dotTools>() || CanResolve<De4dotExeTool>())
+                tools.AddRange(GetDeobfuscationToolSchemas());
+            if (CanResolve<SkillsTools>())
+                tools.AddRange(GetSkillsToolSchemas());
+            if (CanResolve<ScriptTools>())
+                tools.AddRange(GetScriptingToolSchemas());
+            if (CanResolve<WindowTools>())
+                tools.AddRange(GetWindowToolSchemas());
             tools.AddRange(GetUtilityToolSchemas());
-            return tools;
+            return tools.Where(a => IsToolCallable(a.Name)).ToList();
         }
 
         // ── Assembly tools ────────────────────────────────────────────────────────
@@ -75,7 +90,7 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "list_types",
-                Description = "List types in an assembly or namespace. Supports glob (System.* or *Controller) and regex (^System\\..*Controller$) via name_pattern.",
+                Description = "List types in an assembly or namespace, including nested types. Supports glob (System.* or *Controller) and regex (^System\\..*Controller$) via name_pattern.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -175,13 +190,39 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "search_types",
-                Description = "Search for types by name across all loaded assemblies. Supports glob wildcards (*IService*) and regex (^My\\..*Repository$).",
+                Description = "Search for types by name across all loaded assemblies, including nested and compiler-generated types. Supports glob wildcards (*IService*) and regex (^My\\..*Repository$).",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
                         ["query"] = new Dictionary<string, object> {
                             ["type"] = "string",
                             ["description"] = "Search query: plain substring, glob (* and ?), or regex (use ^/$). Matched against FullName."
+                        },
+                        ["cursor"] = new Dictionary<string, object> {
+                            ["type"] = "string",
+                            ["description"] = "Pagination cursor from previous response nextCursor"
+                        }
+                    },
+                    ["required"] = new List<string> { "query" }
+                }
+            },
+            new ToolInfo {
+                Name = "search_methods",
+                Description = "Search for methods across all loaded assemblies, including methods declared on nested and compiler-generated types. Matches against method name, full signature, and declaring type.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["query"] = new Dictionary<string, object> {
+                            ["type"] = "string",
+                            ["description"] = "Search query: plain substring, glob (* and ?), or regex (use ^/$). Matched against method name, full signature, and declaring type."
+                        },
+                        ["assembly_name"] = new Dictionary<string, object> {
+                            ["type"] = "string",
+                            ["description"] = "Optional exact assembly name filter."
+                        },
+                        ["type_pattern"] = new Dictionary<string, object> {
+                            ["type"] = "string",
+                            ["description"] = "Optional declaring-type filter: glob (* and ?) or regex (use ^/$). Matches against type short name and full name."
                         },
                         ["cursor"] = new Dictionary<string, object> {
                             ["type"] = "string",
@@ -645,8 +686,23 @@ namespace dnSpy.MCP.Server.Application
                 }
             },
             new ToolInfo {
+                Name = "rename_method",
+                Description = "Rename a method safely using its declaring type and optional metadata token. Prefer this over rename_member for overloaded methods. Changes are in-memory until save_assembly is called.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Name of the assembly" },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Full name of the declaring type (supports nested types)" },
+                        ["method_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Current method name. Required even when method_token is provided." },
+                        ["new_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "New method name" },
+                        ["method_token"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional metadata token to disambiguate overloads, e.g. 0x06001234" }
+                    },
+                    ["required"] = new List<string> { "assembly_name", "type_full_name", "method_name", "new_name" }
+                }
+            },
+            new ToolInfo {
                 Name = "save_assembly",
-                Description = "Save a (possibly modified) assembly to disk. Persists all in-memory changes made by rename_member, change_member_visibility, edit_assembly_metadata, etc.",
+                Description = "Save a (possibly modified) assembly to disk. Persists all in-memory changes made by rename_member, rename_method, change_member_visibility, edit_assembly_metadata, etc.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -1428,8 +1484,8 @@ namespace dnSpy.MCP.Server.Application
                 Name = "close_dialog",
                 Description = "Close a dialog/message-box window by clicking a button. " +
                     "If no HWND given, closes the first active dialog found. " +
-                    "Button matching is case-insensitive and supports English and Spanish: " +
-                    "ok/aceptar, yes/sí, no, cancel/cancelar, retry/reintentar, ignore/omitir.",
+                    "Button matching is case-insensitive and supports English button names: " +
+                    "ok/accept, yes, no, cancel, retry, ignore.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {

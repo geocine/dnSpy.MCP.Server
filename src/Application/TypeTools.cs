@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module. 
 
@@ -28,6 +29,7 @@ using dnSpy.Contracts.Decompiler;
 using dnSpy.Contracts.Documents.Tabs.DocViewer;
 using dnSpy.Contracts.Documents.TreeView;
 using dnSpy.MCP.Server.Contracts;
+using dnSpy.MCP.Server.Helper;
 
 namespace dnSpy.MCP.Server.Application
 {
@@ -291,6 +293,77 @@ namespace dnSpy.MCP.Server.Application
                 .ToList();
 
             return CreatePaginatedResponse(methods, offset, pageSize);
+        }
+
+        public CallToolResult SearchMethods(Dictionary<string, object>? arguments)
+        {
+            if (arguments == null)
+                throw new ArgumentException("Arguments required");
+            if (!arguments.TryGetValue("query", out var queryObj))
+                throw new ArgumentException("query is required");
+
+            var query = queryObj.ToString() ?? string.Empty;
+            string? assemblyName = null;
+            if (arguments.TryGetValue("assembly_name", out var assemblyNameObj))
+                assemblyName = assemblyNameObj?.ToString();
+
+            string? typePattern = null;
+            if (arguments.TryGetValue("type_pattern", out var typePatternObj))
+                typePattern = typePatternObj?.ToString();
+
+            string? cursor = null;
+            if (arguments.TryGetValue("cursor", out var cursorObj))
+                cursor = cursorObj?.ToString();
+
+            var (offset, pageSize) = DecodeCursor(cursor);
+
+            bool useQueryRegex = query.IndexOfAny(new[] { '*', '?', '^', '$', '[', '(', '|', '+', '{' }) >= 0;
+            var queryRegex = useQueryRegex ? BuildPatternRegex(query) : null;
+
+            System.Text.RegularExpressions.Regex? typeRegex = null;
+            if (!string.IsNullOrWhiteSpace(typePattern))
+                typeRegex = BuildPatternRegex(typePattern!);
+
+            var assemblies = UiThreadHelper.Invoke(() =>
+                documentTreeView.GetAllModuleNodes()
+                    .Select(m => m.Document?.AssemblyDef)
+                    .Where(a => a != null)
+                    .ToList());
+
+            var results = assemblies
+                .Where(a => string.IsNullOrWhiteSpace(assemblyName) ||
+                            a!.Name.String.Equals(assemblyName, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(a => a!.Modules.SelectMany(m => GetAllTypesRecursive(m.Types)))
+                .Where(t => typeRegex == null || typeRegex.IsMatch(t.FullName) || typeRegex.IsMatch(t.Name.String))
+                .SelectMany(t => t.Methods.Select(m => new { Type = t, Method = m }))
+                .Where(x => {
+                    if (queryRegex != null)
+                        return queryRegex.IsMatch(x.Method.Name.String) ||
+                               queryRegex.IsMatch(x.Method.FullName) ||
+                               queryRegex.IsMatch(x.Type.FullName);
+
+                    return x.Method.Name.String.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                           x.Method.FullName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                           x.Type.FullName.Contains(query, StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(x => new
+                {
+                    MethodName = x.Method.Name.String,
+                    Signature = x.Method.FullName,
+                    TypeFullName = x.Type.FullName,
+                    AssemblyName = x.Type.Module.Assembly?.Name.String ?? "Unknown",
+                    IsPublic = x.Method.IsPublic,
+                    IsStatic = x.Method.IsStatic,
+                    IsConstructor = x.Method.IsConstructor,
+                    ParameterCount = x.Method.Parameters.Count,
+                    Token = $"0x{x.Method.MDToken.Raw:X8}"
+                })
+                .OrderBy(x => x.AssemblyName)
+                .ThenBy(x => x.TypeFullName)
+                .ThenBy(x => x.MethodName)
+                .ToList();
+
+            return CreatePaginatedResponse(results, offset, pageSize);
         }
 
         public CallToolResult ListPropertiesInType(Dictionary<string, object>? arguments)
@@ -595,16 +668,20 @@ namespace dnSpy.MCP.Server.Application
 
         AssemblyDef? FindAssemblyByName(string name, string? filePath = null)
         {
-            if (!string.IsNullOrEmpty(filePath)) {
-                var normalized = filePath!.Replace('/', '\\');
-                var byPath = documentTreeView.GetAllModuleNodes()
-                    .FirstOrDefault(m => (m.Document?.Filename ?? "").Replace('/', '\\')
-                        .Equals(normalized, StringComparison.OrdinalIgnoreCase));
-                if (byPath?.Document?.AssemblyDef != null) return byPath.Document.AssemblyDef;
-            }
-            return documentTreeView.GetAllModuleNodes()
-                .Select(m => m.Document?.AssemblyDef)
-                .FirstOrDefault(a => a != null && a.Name.String.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return UiThreadHelper.Invoke(() => {
+                if (!string.IsNullOrEmpty(filePath)) {
+                    var normalized = filePath!.Replace('/', '\\');
+                    var byPath = documentTreeView.GetAllModuleNodes()
+                        .FirstOrDefault(m => (m.Document?.Filename ?? "").Replace('/', '\\')
+                            .Equals(normalized, StringComparison.OrdinalIgnoreCase));
+                    if (byPath?.Document?.AssemblyDef != null)
+                        return byPath.Document.AssemblyDef;
+                }
+
+                return documentTreeView.GetAllModuleNodes()
+                    .Select(m => m.Document?.AssemblyDef)
+                    .FirstOrDefault(a => a != null && a.Name.String.Equals(name, StringComparison.OrdinalIgnoreCase));
+            });
         }
 
         TypeDef? FindTypeInAssembly(AssemblyDef assembly, string fullName)

@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2026 @chichicaste
+    Modifications Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module. 
 
@@ -118,7 +119,7 @@ namespace dnSpy.MCP.Server.Application
             }).ToList();
 
             var allNamespaces = assembly.Modules
-                .SelectMany(m => m.Types)
+                .SelectMany(m => GetAllTypesRecursive(m.Types))
                 .Select(t => t.Namespace.String)
                 .Distinct()
                 .OrderBy(ns => ns)
@@ -138,7 +139,7 @@ namespace dnSpy.MCP.Server.Application
                 ["Namespaces"] = namespacesToReturn,
                 ["NamespacesTotalCount"] = allNamespaces.Count,
                 ["NamespacesReturnedCount"] = namespacesToReturn.Count,
-                ["TypeCount"] = assembly.Modules.Sum(m => m.Types.Count)
+                ["TypeCount"] = assembly.Modules.Sum(m => GetAllTypesRecursive(m.Types).Count())
             };
 
             if (hasMore)
@@ -184,7 +185,7 @@ namespace dnSpy.MCP.Server.Application
                 nameRegex = BuildPatternRegex(namePattern!);
 
             var types = assembly.Modules
-                .SelectMany(m => m.Types)
+                .SelectMany(m => GetAllTypesRecursive(m.Types))
                 .Where(t => {
                     if (!string.IsNullOrEmpty(namespaceFilter) &&
                         !t.Namespace.String.Equals(namespaceFilter, StringComparison.OrdinalIgnoreCase))
@@ -210,6 +211,14 @@ namespace dnSpy.MCP.Server.Application
                 .ToList();
 
             return CreatePaginatedResponse(types, offset, pageSize);
+        }
+
+        static IEnumerable<TypeDef> GetAllTypesRecursive(IEnumerable<TypeDef> types) {
+            foreach (var type in types) {
+                yield return type;
+                foreach (var nested in GetAllTypesRecursive(type.NestedTypes))
+                    yield return nested;
+            }
         }
 
         public CallToolResult ListNativeModules(Dictionary<string, object>? arguments)
