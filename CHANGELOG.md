@@ -7,23 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Tool inventory now lives in `docs/tool-reference.md`, and the main `README.md` is kept lean around build, run, and MCP client setup.
+
+## [2.0.0] - 2026-03-20
+
 ### Added
-- Added the living v2 implementation plan at `docs/dnspy-mcp-v2-plan.md`.
-- Added `THIRD_PARTY_NOTICES.md` to track provenance for imported or adapted external components.
-- Added a public `dnspy_resolve_token` navigation tool for resolving .NET metadata tokens within loaded assemblies.
-- Added reconstruction identity tools: `dnspy_get_pe_info`, `dnspy_normalize_member_id`, `dnspy_resolve_member_id`, and `dnspy_get_member_details`.
-- Added reconstruction workflow tools: `dnspy_get_decompiled_source`, `dnspy_batch_get_decompiled_source`, `dnspy_decompile_assembly`, `dnspy_get_startup_map`, `dnspy_get_resource_map`, and `dnspy_get_reconstruction_diagnostics`.
-- Added metadata/low-level reconstruction tools: `dnspy_validate_assembly`, `dnspy_list_metadata_tables`, `dnspy_dump_metadata_heap`, `dnspy_get_native_imports`, `dnspy_get_native_exports`, `dnspy_get_native_module_map`, `dnspy_get_manifest_and_entrypoints`, and `dnspy_get_cfg`.
-- Added obfuscation-aware recovery tools: `dnspy_detect_anti_debug`, `dnspy_detect_anti_tamper`, `dnspy_detect_string_encryption`, `dnspy_find_proxy_methods`, `dnspy_find_delegate_creation`, `dnspy_find_dynamic_code`, `dnspy_find_byte_arrays`, `dnspy_find_embedded_pes`, `dnspy_analyze_control_flow`, `dnspy_get_protection_report`, `dnspy_triage`, `dnspy_suggest_symbol_renames`, and `dnspy_get_semantic_labels`.
-- Added offline framework/package correlation tools: `dnspy_match_framework_or_package` and `dnspy_label_third_party_components`.
-- Added incremental patchback rename tools: `dnspy_rename_symbol` and `dnspy_rename_parameter`.
-- Added dnSpy-host navigation/debugger tools for interactive reconstruction work: `dnspy_inspect_breakpoint`, `dnspy_get_selected_node`, `dnspy_get_active_tab`, `dnspy_select_document_node`, and `dnspy_follow_reference`.
+- Introduced a code-mode-first MCP bootstrap with staged discovery via `dnspy_search_tools`, `dnspy_get_tool_schemas`, tool groups, and constrained `dnspy_execute_code`.
+- Added streamable HTTP MCP support on `POST /mcp` as the primary transport, while keeping legacy SSE endpoints available for older clients.
+- Added major v2 reconstruction coverage across source recovery, metadata/native inspection, deobfuscation triage, provenance correlation, project export, and dnSpy-host navigation.
+- Added dnSpy-integrated MCP settings and logging UI under `Options -> MCP Server`.
+- Added v2 planning and architecture docs for the reconstruction-first surface.
 
 ### Changed
-- Started v2 foundation work on branch `feature/dnspy-mcp-v2`.
-- Updated server metadata to version `2.0.0` on the v2 branch.
-- Began aligning the repository text and source headers with the root GPLv3 license.
-- Reframed the v2 roadmap around software reconstruction, architecture recovery, obfuscation-aware analysis, known-binary/source correlation, and dnSpy-hosted runtime-assisted recovery instead of broad UI feature parity or generic external automation.
+- Standardized the public MCP surface around `dnspy_*` tool names.
+- Changed `tools/list` to return a bootstrap-only surface by default; broader workflows are enabled per session, while code mode can still discover and call hidden tools through controlled execution.
+- Changed the preferred client transport from the older SSE-first shape to streamable HTTP, with `/mcp` as the primary endpoint for modern MCP clients.
+- Refocused the project around software reconstruction from .NET binaries, including runtime-assisted analysis through dnSpy-host interaction when static inspection is not enough.
+- Streamlined build and setup around `build.bat`, automatic dnSpy checkout repair, and runtime output copying for the extension.
+- Aligned repository metadata, documentation, and source attribution with the intended GPLv3 project licensing.
+
+### Documentation
+- Moved the exhaustive tool catalog into `docs/tool-reference.md`, including per-tool descriptions and v2 attribution markers for tools that are new or substantially improved in this repository.
 
 ## [1.7.0] - 2026-02-28
 

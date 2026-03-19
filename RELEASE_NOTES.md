@@ -1,8 +1,31 @@
-# dnSpy MCP Server — Release Notes
+# dnSpy MCP Server - Release Notes
 
 ---
 
-## v1.6.0 — 2026-02-27
+## v2.0.0 - 2026-03-20
+
+### New: Reconstruction-first v2 release
+
+`v2.0.0` shifts the server from a broad growing toolset into a reconstruction-first MCP surface for dnSpy. The main additions are a code-mode-first bootstrap, staged tool discovery, a much larger reverse-engineering and recovery surface, and direct dnSpy host navigation for workflows that need UI context as well as static analysis.
+
+### Highlights
+
+- **Streamable HTTP transport**: the server now exposes streamable HTTP on `POST /mcp` as the primary MCP endpoint for modern clients, while legacy SSE remains available for older integrations.
+- **Code-mode-first MCP bootstrap**: `tools/list` now starts narrow and exposes staged discovery through `dnspy_search_tools`, `dnspy_get_tool_schemas`, tool groups, and constrained `dnspy_execute_code`.
+- **Expanded reconstruction surface**: major additions across source recovery, metadata and native inspection, deobfuscation triage, provenance correlation, symbol/source matching, and project export.
+- **dnSpy host integration**: new UI-navigation tools let MCP clients inspect the selected node, focus debugger context, follow references, and select document nodes directly in the dnSpy UI.
+- **Integrated MCP settings UI**: host, port, logging, de4dot paths, and related settings are now managed from `Options -> MCP Server`.
+- **Build and setup cleanup**: `build.bat` is now the intended entry point for repairing the dnSpy checkout, building the host, and producing the MCP extension outputs.
+
+### Documentation
+
+- Main setup guide: `README.md`
+- Exhaustive tool catalog with per-tool descriptions and v2 attribution: `docs/tool-reference.md`
+- Architecture notes: `docs/ARCHITECTURE.md`
+
+---
+
+## v1.6.0 - 2026-02-27
 
 ### New: Active Debug Stepping, Expression Evaluation & Memory Patching
 
