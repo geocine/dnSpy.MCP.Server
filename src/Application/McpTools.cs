@@ -52,7 +52,6 @@ namespace dnSpy.MCP.Server.Application
         readonly Lazy<MemoryInspectTools> memoryInspectTools;
         readonly Lazy<UsageFindingCommandTools> usageFindingTools;
         readonly Lazy<CodeAnalysisHelpers> codeAnalysisTools;
-        readonly Lazy<De4dotExeTool> de4dotExeTool;
         readonly Lazy<De4dotTools> de4dotTools;
         readonly Lazy<ScriptTools> scriptTools;
         readonly Lazy<WindowTools> windowTools;
@@ -70,7 +69,6 @@ namespace dnSpy.MCP.Server.Application
             this.memoryInspectTools = CreateLazy<MemoryInspectTools>();
             this.usageFindingTools = CreateLazy<UsageFindingCommandTools>();
             this.codeAnalysisTools = CreateLazy<CodeAnalysisHelpers>();
-            this.de4dotExeTool = CreateLazy<De4dotExeTool>();
             this.de4dotTools = CreateLazy<De4dotTools>();
             this.scriptTools = CreateLazy<ScriptTools>();
             this.windowTools = CreateLazy<WindowTools>();
@@ -150,7 +148,6 @@ namespace dnSpy.MCP.Server.Application
             "set_exception_breakpoint" or "remove_exception_breakpoint" or
             "list_exception_breakpoints" => CanResolve<DebugTools>(),
 
-            "run_de4dot" => CanResolve<De4dotExeTool>(),
             "list_deobfuscators" or "detect_obfuscator" or "deobfuscate_assembly" or
             "save_deobfuscated" => CanResolve<De4dotTools>(),
 
@@ -397,8 +394,6 @@ namespace dnSpy.MCP.Server.Application
                     "set_exception_breakpoint"    => InvokeLazy(debugTools, "SetExceptionBreakpoint",    arguments),
                     "remove_exception_breakpoint" => InvokeLazy(debugTools, "RemoveExceptionBreakpoint", arguments),
                     "list_exception_breakpoints"  => InvokeLazy(debugTools, "ListExceptionBreakpoints",  arguments),
-
-                    "run_de4dot"            => InvokeLazy(de4dotExeTool, "RunDe4dot",            arguments),
 
                     // de4dot deobfuscation tools
                     "list_deobfuscators"    => InvokeLazy(de4dotTools, "ListDeobfuscators",    arguments),

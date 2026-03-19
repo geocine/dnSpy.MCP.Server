@@ -19,8 +19,6 @@ if /i "%FIRST_ARG%"=="all" goto :run_all
 if /i "%FIRST_ARG%"=="dnspy" goto :run_dnspy
 if /i "%FIRST_ARG%"=="mcp" goto :run_mcp
 if /i "%FIRST_ARG%"=="mcp-net10" goto :run_mcp_net10
-if /i "%FIRST_ARG%"=="mcp-net48" goto :run_mcp_net48
-if /i "%FIRST_ARG%"=="mcp-all" goto :run_mcp_all
 if /i "%FIRST_ARG%"=="nuke" goto :run_passthrough_after_keyword
 if /i "%FIRST_ARG%"=="help" goto :usage_ok
 if /i "%FIRST_ARG%"=="-h" goto :usage_ok
@@ -53,14 +51,6 @@ goto :invoke
 set "NUKE_ARGS=--target McpNet10 %REST_ARGS%"
 goto :invoke
 
-:run_mcp_net48
-set "NUKE_ARGS=--target McpNet48 %REST_ARGS%"
-goto :invoke
-
-:run_mcp_all
-set "NUKE_ARGS=--target McpAll %REST_ARGS%"
-goto :invoke
-
 :run_passthrough
 set "NUKE_ARGS=%*"
 goto :invoke
@@ -81,14 +71,12 @@ dotnet run --project "%BUILD_PROJECT%" -- %NUKE_ARGS%
 exit /b %errorlevel%
 
 :usage_ok
-echo Usage: build.bat [all^|dnspy^|mcp^|mcp-net10^|mcp-net48^|mcp-all^|nuke ...]
+echo Usage: build.bat [all^|dnspy^|mcp^|mcp-net10^|nuke ...]
 echo.
-echo   all        Repair/build dnSpy, fix known output quirks, then build the MCP extension for net10.0-windows. Default.
-echo   dnspy      Repair/build only the dnSpy host and known output quirks.
+echo   all        Repair/build dnSpy, ensure de4dotEx is available, then build the MCP extension for net10.0-windows. Default.
+echo   dnspy      Repair/build only the dnSpy host and ensure de4dotEx is available.
 echo   mcp        Alias for mcp-net10.
 echo   mcp-net10  Build only the MCP extension for net10.0-windows.
-echo   mcp-net48  Attempt to build only the MCP extension for net48.
-echo   mcp-all    Attempt to build the MCP extension for all target frameworks.
 echo   nuke ...   Pass raw arguments through to the underlying NUKE build.
 echo.
 echo Examples:

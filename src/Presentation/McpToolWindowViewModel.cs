@@ -22,7 +22,6 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
 using dnSpy.Contracts.MVVM;
@@ -54,9 +53,6 @@ namespace dnSpy.MCP.Server.Presentation {
 		bool enableFileLogging = true;
 		bool enableOutputPaneLogging = true;
 		bool enableToolCallLogging = true;
-		string de4dotExePath = string.Empty;
-		string de4dotSearchPathsText = string.Empty;
-		int de4dotMaxSearchDepth = 6;
 		string logText = string.Empty;
 
 		[ImportingConstructor]
@@ -223,36 +219,6 @@ namespace dnSpy.MCP.Server.Presentation {
 			}
 		}
 
-		public string De4dotExePath {
-			get => de4dotExePath;
-			set {
-				if (de4dotExePath != value) {
-					de4dotExePath = value;
-					OnPropertyChanged(nameof(De4dotExePath));
-				}
-			}
-		}
-
-		public string De4dotSearchPathsText {
-			get => de4dotSearchPathsText;
-			set {
-				if (de4dotSearchPathsText != value) {
-					de4dotSearchPathsText = value;
-					OnPropertyChanged(nameof(De4dotSearchPathsText));
-				}
-			}
-		}
-
-		public int De4dotMaxSearchDepth {
-			get => de4dotMaxSearchDepth;
-			set {
-				if (de4dotMaxSearchDepth != value) {
-					de4dotMaxSearchDepth = value;
-					OnPropertyChanged(nameof(De4dotMaxSearchDepth));
-				}
-			}
-		}
-
 		public string LogText {
 			get => logText;
 			private set {
@@ -278,9 +244,6 @@ namespace dnSpy.MCP.Server.Presentation {
 			cfg.EnableFileLogging = EnableFileLogging;
 			cfg.EnableOutputPaneLogging = EnableOutputPaneLogging;
 			cfg.EnableToolCallLogging = EnableToolCallLogging;
-			cfg.De4dotExePath = De4dotExePath;
-			cfg.De4dotSearchPaths = ParseMultilinePaths(De4dotSearchPathsText);
-			cfg.De4dotMaxSearchDepth = De4dotMaxSearchDepth;
 			cfg.Save();
 
 			ApplyEditorStateToRuntime(forceRestart);
@@ -369,9 +332,6 @@ namespace dnSpy.MCP.Server.Presentation {
 			EnableFileLogging = cfg.EnableFileLogging;
 			EnableOutputPaneLogging = cfg.EnableOutputPaneLogging;
 			EnableToolCallLogging = cfg.EnableToolCallLogging;
-			De4dotExePath = cfg.De4dotExePath;
-			De4dotSearchPathsText = string.Join(Environment.NewLine, cfg.De4dotSearchPaths ?? Enumerable.Empty<string>());
-			De4dotMaxSearchDepth = cfg.De4dotMaxSearchDepth;
 		}
 
 		void UpdateStatus() {
@@ -404,14 +364,6 @@ namespace dnSpy.MCP.Server.Presentation {
 				logEntries.RemoveAt(0);
 			LogText = string.Join(Environment.NewLine, logEntries);
 		}
-
-		static List<string> ParseMultilinePaths(string value) =>
-			value
-				.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-				.Select(a => a.Trim())
-				.Where(a => a.Length > 0)
-				.Distinct(StringComparer.OrdinalIgnoreCase)
-				.ToList();
 
 		static void OpenInExplorer(string path, bool selectFile) {
 			if (string.IsNullOrWhiteSpace(path))

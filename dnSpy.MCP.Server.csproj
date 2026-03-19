@@ -1,8 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <Import Project="$(MSBuildThisFileDirectory)dnSpy\DnSpyCommon.props" />
 
   <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFrameworks></TargetFrameworks>
+    <IsDotNetFramework>false</IsDotNetFramework>
+    <IsDotNet>true</IsDotNet>
+    <IsSelfContainedDotNet>true</IsSelfContainedDotNet>
     <AssemblyName>dnSpy.MCP.Server.x</AssemblyName>
     <Description>MCP Server for AI-assisted .NET assembly analysis and BepInEx plugin development</Description>
     <Copyright>Copyright (C) 2026 @chichicaste, @geocine</Copyright>
@@ -16,10 +21,8 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <NoWarn>$(NoWarn);NU1903</NoWarn>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(TargetFramework)' == 'net48' ">
-    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+    <De4dotProjectPath>$(MSBuildThisFileDirectory)de4dotEx\de4dot.cui\de4dot.cui.csproj</De4dotProjectPath>
+    <De4dotOutputDir>$(MSBuildThisFileDirectory)libs\de4dot-net8\</De4dotOutputDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,50 +33,25 @@
     <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger.DotNet.CorDebug\dnSpy.Contracts.Debugger.DotNet.CorDebug.csproj" />
   </ItemGroup>
 
-  <!-- de4dot integration (deobfuscation engine) — DLLs bundled in libs/ -->
-  <!-- net48 build uses libs/de4dot/ (net48 DLLs) -->
-  <!-- net10 build uses libs/de4dot-net8/ (net8 DLLs, compatible with net10) -->
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net48' ">
+  <ItemGroup>
     <Reference Include="de4dot.code">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot\de4dot.code.dll</HintPath>
+      <HintPath>$(De4dotOutputDir)de4dot.code.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="de4dot.blocks">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot\de4dot.blocks.dll</HintPath>
+      <HintPath>$(De4dotOutputDir)de4dot.blocks.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="de4dot.mdecrypt">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot\de4dot.mdecrypt.dll</HintPath>
+      <HintPath>$(De4dotOutputDir)de4dot.mdecrypt.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="de4dot.cui">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot\de4dot.cui.dll</HintPath>
+      <HintPath>$(De4dotOutputDir)de4dot.cui.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="AssemblyData">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot\AssemblyData.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFramework)' != 'net48' ">
-    <Reference Include="de4dot.code">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot-net8\de4dot.code.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="de4dot.blocks">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot-net8\de4dot.blocks.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="de4dot.mdecrypt">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot-net8\de4dot.mdecrypt.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="de4dot.cui">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot-net8\de4dot.cui.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="AssemblyData">
-      <HintPath>$(MSBuildThisFileDirectory)libs\de4dot-net8\AssemblyData.dll</HintPath>
+      <HintPath>$(De4dotOutputDir)AssemblyData.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
@@ -91,12 +69,6 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- For .NET Framework 4.8, we'll use a simpler HTTP listener approach -->
-  <ItemGroup Condition=" '$(IsDotNetFramework)' == 'true' ">
-    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
-    <PackageReference Include="System.Resources.Extensions" Version="10.0.0" />
-  </ItemGroup>
-
   <ItemGroup>
     <Compile Include="src\**\*.cs" />
     <Page Include="src\**\*.xaml" />
@@ -108,6 +80,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="BuildDe4dotLibraries" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(De4dotProjectPath)')" Text="de4dotEx submodule is missing. Run 'git submodule update --init --recursive'." />
+    <MakeDir Directories="$(De4dotOutputDir)" />
+    <Exec Command="dotnet build &quot;$(De4dotProjectPath)&quot; -c Release -f net8.0 --nologo -o &quot;$(De4dotOutputDir)&quot;" />
+  </Target>
 
   <Target Name="CopyNet10ExtensionToRuntimeSpecificDnSpyOutputs" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net10.0-windows' and '$(CopyExtensionToRuntimeOutputs)' == 'true'">
     <ItemGroup>

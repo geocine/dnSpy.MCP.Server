@@ -11,8 +11,5 @@
   "logLevel": "Info",
   "enableFileLogging": true,
   "enableOutputPaneLogging": true,
-  "enableToolCallLogging": true,
-  "de4dotExePath": "",
-  "de4dotSearchPaths": [],
-  "de4dotMaxSearchDepth": 6
+  "enableToolCallLogging": true
 }

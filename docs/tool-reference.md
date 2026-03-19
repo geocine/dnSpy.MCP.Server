@@ -98,7 +98,7 @@ This reference documents the public `dnspy_*` MCP surface exposed by this reposi
   - [`dnspy_list_native_modules`](#dnspy_list_native_modules)
   - [`dnspy_scan_pe_strings`](#dnspy_scan_pe_strings)
   - [`dnspy_validate_assembly`](#dnspy_validate_assembly)
-- **[Deobfuscation and recovery](#deobfuscation-and-recovery)** (20 tools)
+- **[Deobfuscation and recovery](#deobfuscation-and-recovery)** (19 tools)
   - [`dnspy_analyze_control_flow`](#dnspy_analyze_control_flow)
   - [`dnspy_analyze_static_constructors`](#dnspy_analyze_static_constructors)
   - [`dnspy_deobfuscate_assembly`](#dnspy_deobfuscate_assembly)
@@ -115,7 +115,6 @@ This reference documents the public `dnspy_*` MCP surface exposed by this reposi
   - [`dnspy_get_protection_report`](#dnspy_get_protection_report)
   - [`dnspy_get_semantic_labels`](#dnspy_get_semantic_labels)
   - [`dnspy_list_deobfuscators`](#dnspy_list_deobfuscators)
-  - [`dnspy_run_de4dot`](#dnspy_run_de4dot)
   - [`dnspy_save_deobfuscated`](#dnspy_save_deobfuscated)
   - [`dnspy_suggest_symbol_renames`](#dnspy_suggest_symbol_renames)
   - [`dnspy_triage`](#dnspy_triage)
@@ -721,11 +720,6 @@ This reference documents the public `dnspy_*` MCP surface exposed by this reposi
 
 ### `dnspy_list_deobfuscators`
 **Description:** List all obfuscator types supported by the integrated de4dot engine (e.g. ConfuserEx, Dotfuscator, SmartAssembly, etc.).
-
-**Attribution:** New in v2 / this repository
-
-### `dnspy_run_de4dot`
-**Description:** Run de4dot.exe as an external process to deobfuscate a .NET assembly. Supports all de4dot features including dynamic string decryption and ConfuserEx method decryption. Works in all builds.
 
 **Attribution:** New in v2 / this repository
 

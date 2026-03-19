@@ -12,16 +12,15 @@ class Build : NukeBuild
     string Root => RootDirectory;
     string SubmoduleName => "dnSpy";
     string RootGitModulesPath => Path.Combine(Root, ".gitmodules");
-    string SubmodulePath => Path.Combine(Root, SubmoduleName);
-    string SubmoduleGitConfig => Path.Combine(Root, ".git", "modules", SubmoduleName, "config");
-    string SolutionPath => Path.Combine(SubmodulePath, "dnSpy.sln");
+    string DnSpySubmodulePath => Path.Combine(Root, SubmoduleName);
+    string De4dotSubmoduleName => "de4dotEx";
+    string DnSpySubmoduleGitConfig => Path.Combine(Root, ".git", "modules", SubmoduleName, "config");
+    string De4dotSubmoduleGitConfig => Path.Combine(Root, ".git", "modules", De4dotSubmoduleName, "config");
+    string SolutionPath => Path.Combine(DnSpySubmodulePath, "dnSpy.sln");
     string McpProjectPath => Path.Combine(Root, "dnSpy.MCP.Server.csproj");
-    string HostNet48Dir => Path.Combine(SubmodulePath, "dnSpy", "dnSpy", "bin", "Release", "net48");
-    string ThemesDestinationDir => Path.Combine(HostNet48Dir, "Themes");
-    string ThemesSourceDir => Path.Combine(HostNet48Dir, "bin", "Themes");
 
     Target All => _ => _
-        .Description("Repairs/builds dnSpy, then builds the MCP extension for net10.0-windows.")
+        .Description("Repairs/builds dnSpy and de4dotEx, then builds the MCP extension for net10.0-windows.")
         .DependsOn(DnSpy)
         .Executes(() =>
         {
@@ -29,10 +28,10 @@ class Build : NukeBuild
         });
 
     Target DnSpy => _ => _
-        .Description("Repairs/builds dnSpy and fixes known output quirks.")
-        .DependsOn(FixDnSpyThemes);
+        .Description("Repairs/builds dnSpy and ensures the de4dotEx submodule is available.")
+        .DependsOn(PrepareSubmodules, BuildDnSpySolution);
 
-    Target PrepareDnSpyCheckout => _ => _
+    Target PrepareSubmodules => _ => _
         .Executes(() =>
         {
             if (!EnvironmentInfo.IsWin)
@@ -41,8 +40,8 @@ class Build : NukeBuild
             if (!File.Exists(RootGitModulesPath))
                 throw new InvalidOperationException($".gitmodules was not found in '{Root}'.");
 
-            Console.WriteLine("[1/4] Ensuring dnSpy submodule metadata...");
-            if (File.Exists(SubmoduleGitConfig))
+            Console.WriteLine("[1/3] Ensuring dnSpy submodule metadata...");
+            if (File.Exists(DnSpySubmoduleGitConfig) && File.Exists(De4dotSubmoduleGitConfig))
             {
                 Console.WriteLine("Submodule metadata already exists. Skipping sync.");
             }
@@ -51,54 +50,32 @@ class Build : NukeBuild
                 RunGit("submodule sync --recursive");
             }
 
-            Console.WriteLine("[2/4] Ensuring dnSpy submodule checkout...");
-            if (SubmoduleIsAligned())
+            Console.WriteLine("[2/3] Ensuring dnSpy and de4dotEx submodule checkouts...");
+            if (SubmodulesAreAligned())
             {
-                Console.WriteLine("Submodule checkout already matches the pinned commits. Skipping update.");
+                Console.WriteLine("Submodule checkouts already match the pinned commits. Skipping update.");
             }
             else
             {
                 try
                 {
-                    RunGit($"submodule update --init --recursive --force {SubmoduleName}");
+                    RunGit($"submodule update --init --recursive --force {SubmoduleName} {De4dotSubmoduleName}");
                 }
                 catch
                 {
                     Console.WriteLine("Initial submodule update failed. Attempting clean recovery...");
-                    RecoverSubmodule();
+                    RecoverSubmodule(SubmoduleName, DnSpySubmodulePath);
+                    RecoverSubmodule(De4dotSubmoduleName, Path.Combine(Root, De4dotSubmoduleName));
                 }
             }
         });
 
     Target BuildDnSpySolution => _ => _
-        .DependsOn(PrepareDnSpyCheckout)
+        .DependsOn(PrepareSubmodules)
         .Executes(() =>
         {
-            Console.WriteLine("[3/4] Building dnSpy solution without a global TargetFramework override...");
-            RunDotNet($"build \"{SolutionPath}\" -c Release --nologo");
-        });
-
-    Target FixDnSpyThemes => _ => _
-        .DependsOn(BuildDnSpySolution)
-        .Executes(() =>
-        {
-            Console.WriteLine("[4/4] Normalizing net48 theme files...");
-
-            Directory.CreateDirectory(ThemesDestinationDir);
-
-            if (Directory.Exists(ThemesSourceDir))
-            {
-                foreach (var sourceFile in Directory.GetFiles(ThemesSourceDir, "*.dntheme"))
-                {
-                    var destinationFile = Path.Combine(ThemesDestinationDir, Path.GetFileName(sourceFile));
-                    File.Copy(sourceFile, destinationFile, overwrite: true);
-                }
-            }
-
-            if (!Directory.EnumerateFiles(ThemesDestinationDir, "*.dntheme").Any())
-                throw new InvalidOperationException($"No .dntheme files were found in '{ThemesDestinationDir}'.");
-
-            Console.WriteLine($"Theme files are available in '{ThemesDestinationDir}'.");
+            Console.WriteLine("[3/3] Building dnSpy solution for net10.0-windows...");
+            RunDotNet($"build \"{SolutionPath}\" -c Release -p:TargetFramework=net10.0-windows --nologo");
         });
 
     Target McpNet10 => _ => _
@@ -108,21 +85,7 @@ class Build : NukeBuild
             BuildMcpProject("net10.0-windows");
         });
 
-    Target McpNet48 => _ => _
-        .Description("Attempts to build the MCP extension for net48.")
-        .Executes(() =>
-        {
-            BuildMcpProject("net48");
-        });
-
-    Target McpAll => _ => _
-        .Description("Attempts to build the MCP extension for all target frameworks.")
-        .Executes(() =>
-        {
-            RunDotNet($"build \"{McpProjectPath}\" -c Release --nologo");
-        });
-
-    bool SubmoduleIsAligned()
+    bool SubmodulesAreAligned()
     {
         var process = RunProcessChecked("git", "submodule status --recursive", logOutput: false);
         var lines = process.Output
@@ -134,19 +97,19 @@ class Build : NukeBuild
                lines.All(line => line[0] == ' ' && !line.Contains("-dirty", StringComparison.OrdinalIgnoreCase));
     }
 
-    void RecoverSubmodule()
+    void RecoverSubmodule(string submoduleName, string submodulePath)
     {
-        RunGit($"submodule deinit -f -- {SubmoduleName}");
+        RunGit($"submodule deinit -f -- {submoduleName}");
 
-        if (Directory.Exists(SubmodulePath))
+        if (Directory.Exists(submodulePath))
         {
-            RunProcessChecked("cmd", $"/c rmdir /s /q \"{SubmodulePath}\"");
-            if (Directory.Exists(SubmodulePath))
-                throw new InvalidOperationException($"Failed to remove '{SubmodulePath}' during submodule recovery.");
+            RunProcessChecked("cmd", $"/c rmdir /s /q \"{submodulePath}\"");
+            if (Directory.Exists(submodulePath))
+                throw new InvalidOperationException($"Failed to remove '{submodulePath}' during submodule recovery.");
         }
 
         RunGit("submodule sync --recursive");
-        RunGit($"submodule update --init --recursive --force {SubmoduleName}");
+        RunGit($"submodule update --init --recursive --force {submoduleName}");
     }
 
     void RunGit(string arguments)

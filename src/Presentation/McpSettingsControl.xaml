@@ -110,32 +110,10 @@
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable tool call logging" />
                             <CheckBox Grid.Row="0" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableToolCallLogging}" />
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="de4dot.exe path" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,4" Text="{Binding De4dotExePath, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Top" Text="de4dot search paths" />
-                            <TextBox Grid.Row="2"
-                                     Grid.Column="1"
-                                     Margin="0,4,0,4"
-                                     MinHeight="80"
-                                     AcceptsReturn="True"
-                                     AcceptsTab="True"
-                                     TextWrapping="NoWrap"
-                                     VerticalContentAlignment="Top"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     Text="{Binding De4dotSearchPathsText, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="de4dot max search depth" />
-                            <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4,0,4" Text="{Binding De4dotMaxSearchDepth, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
                         <WrapPanel>

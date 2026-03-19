@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed `tools/list` to return a bootstrap-only surface by default; broader workflows are enabled per session, while code mode can still discover and call hidden tools through controlled execution.
 - Changed the preferred client transport from the older SSE-first shape to streamable HTTP, with `/mcp` as the primary endpoint for modern MCP clients.
 - Refocused the project around software reconstruction from .NET binaries, including runtime-assisted analysis through dnSpy-host interaction when static inspection is not enough.
-- Streamlined build and setup around `build.bat`, automatic dnSpy checkout repair, and runtime output copying for the extension.
+- Streamlined build and setup around `build.bat`, automatic submodule checkout repair, net10-only host builds, and runtime output copying for the extension.
+- Switched de4dot integration from checked-in DLLs to the `de4dotEx/` git submodule and generated net8 build outputs staged under `libs/de4dot-net8/`.
+- Dropped `net48` support from the MCP project, NUKE/build entrypoints, and user-facing setup documentation.
+- Removed the external `run_de4dot` tool and all `de4dot.exe` path/search configuration from the MCP UI and `mcp-config.json`.
 - Aligned repository metadata, documentation, and source attribution with the intended GPLv3 project licensing.
 
 ### Documentation

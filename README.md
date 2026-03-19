@@ -10,8 +10,7 @@ An embedded MCP server for dnSpy focused on .NET reconstruction, decompilation, 
 
 - Windows
 - .NET 10 SDK
-- `.NET Framework 4.8` targeting pack if you want the `net48` build
-- Git submodules enabled for the vendored `dnSpy/` checkout
+- Git submodules enabled for the vendored `dnSpy/` and `de4dotEx/` checkouts
 
 ## Getting started
 
@@ -33,7 +32,7 @@ git submodule update --init --recursive
 Use `build.bat`. It is the intended entry point and wraps the NUKE build.
 
 ```bash
-# Default: repair/build dnSpy, normalize known host output quirks,
+# Default: repair/build dnSpy, build the de4dotEx submodule payload,
 # then build the MCP extension for net10.0-windows
 build.bat
 
@@ -43,29 +42,25 @@ build.bat dnspy
 # Build only the MCP extension for net10.0-windows
 build.bat mcp
 
-# Optional builds
-build.bat mcp-net48
-build.bat mcp-all
-
 # Raw NUKE passthrough
 build.bat nuke --target McpNet10 --verbosity verbose
 ```
 
 Build outputs:
 
-- Extension output root: `dnSpy/dnSpy/dnSpy/bin/Release/<target-framework>/`
+- Extension output root: `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/`
 - `net10.0-windows` runtime copies: `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/win-x64/` and `win-x86/`
 - Main extension assembly: `dnSpy.MCP.Server.x.dll`
 - Default config deployed next to the extension: `mcp-config.json`
+- Generated de4dot payload: `libs/de4dot-net8/` (build output, git-ignored)
 
 ## Run
 
 Start the dnSpy host you built:
 
-- `net10.0-windows`: launch `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/win-x64/dnSpy.exe`
-- `net48`: launch `dnSpy/dnSpy/dnSpy/bin/Release/net48/dnSpy.exe`
+- launch `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/dnSpy.exe`
 
-The MCP server starts automatically when `Enable server` is on. Host, port, logging, de4dot paths, and related settings are available in `Options -> MCP Server` and persisted through `mcp-config.json`.
+The MCP server starts automatically when `Enable server` is on. Host, port, logging, and related settings are available in `Options -> MCP Server` and persisted through `mcp-config.json`. de4dot support is built in from the vendored `de4dotEx/` submodule; there is no external `de4dot.exe` path to configure.
 
 Default HTTP endpoints:
 

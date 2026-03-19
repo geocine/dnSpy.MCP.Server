@@ -47,7 +47,7 @@ namespace dnSpy.MCP.Server.Application
                 tools.AddRange(GetDebugToolSchemas());
             if (CanResolve<MemoryInspectTools>() || CanResolve<DumpTools>())
                 tools.AddRange(GetMemoryToolSchemas());
-            if (CanResolve<De4dotTools>() || CanResolve<De4dotExeTool>())
+            if (CanResolve<De4dotTools>())
                 tools.AddRange(GetDeobfuscationToolSchemas());
             if (CanResolve<ScriptTools>())
                 tools.AddRange(GetScriptingToolSchemas());
@@ -2678,25 +2678,6 @@ namespace dnSpy.MCP.Server.Application
 
         // ── Deobfuscation tools ───────────────────────────────────────────────────
         List<ToolInfo> GetDeobfuscationToolSchemas() => new List<ToolInfo> {
-            new ToolInfo {
-                Name = "run_de4dot",
-                Description = "Run de4dot.exe as an external process to deobfuscate a .NET assembly. Supports all de4dot features including dynamic string decryption and ConfuserEx method decryption. Works in all builds.",
-                InputSchema = new Dictionary<string, object> {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object> {
-                        ["file_path"]        = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Path to the input .NET assembly to deobfuscate." },
-                        ["output_path"]      = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Output path for the cleaned assembly (default: input + .deobfuscated.exe)." },
-                        ["obfuscator_type"]  = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "de4dot type code to force: cr (ConfuserEx), un (unknown/auto), an, bl, co, df, dr3, dr4, ef, etc. Leave empty for auto-detection." },
-                        ["dont_rename"]      = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "If true, don't rename obfuscated symbols (default false)." },
-                        ["no_cflow_deob"]    = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "If true, skip control-flow deobfuscation (default false)." },
-                        ["string_decrypter"] = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "String decrypter mode: none, default, static, delegate, emulate." },
-                        ["extra_args"]       = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Any additional de4dot command-line arguments passed verbatim." },
-                        ["de4dot_path"]      = new Dictionary<string, object> { ["type"] = "string",  ["description"] = "Override path to de4dot.exe. If omitted, uses well-known search paths." },
-                        ["timeout_ms"]       = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "Maximum time to wait for de4dot to finish (default 120000 ms)." }
-                    },
-                    ["required"] = new List<string> { "file_path" }
-                }
-            },
             new ToolInfo {
                 Name = "list_deobfuscators",
                 Description = "List all obfuscator types supported by the integrated de4dot engine (e.g. ConfuserEx, Dotfuscator, SmartAssembly, etc.).",

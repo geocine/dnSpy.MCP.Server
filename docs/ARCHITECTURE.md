@@ -242,19 +242,18 @@ Responsibilities:
 - cross-assembly dependency analysis
 - dead-code approximation
 
-### `De4dotTools` and `De4dotExeTool`
+### `De4dotTools`
 
 Files:
 
 - [src/Application/De4dotTools.cs](../src/Application/De4dotTools.cs)
-- de4dot exe integration is also part of the application layer through `De4dotExeTool`
 
 Responsibilities:
 
 - integrated deobfuscation flows
 - obfuscator detection
 - save/export of deobfuscated outputs
-- external `de4dot.exe` execution when the external process path is the right fit
+- in-process de4dot execution backed by assemblies built from the `de4dotEx/` submodule
 
 ### `ScriptTools`
 
@@ -308,7 +307,7 @@ Configuration model:
 
 - persisted in `mcp-config.json`
 - surfaced in dnSpy through `Options -> MCP Server`
-- includes host, port, API key, logging controls, de4dot paths, and discovery-related settings such as `ExposeFullToolCatalog` and implicit default session behavior
+- includes host, port, API key, logging controls, and discovery-related settings such as `ExposeFullToolCatalog` and implicit default session behavior
 
 Logging model:
 

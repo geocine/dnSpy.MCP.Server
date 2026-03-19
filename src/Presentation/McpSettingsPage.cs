@@ -22,7 +22,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
-using System.Linq;
 using dnSpy.Contracts.MVVM;
 using dnSpy.Contracts.Settings.Dialog;
 using dnSpy.MCP.Server.Configuration;
@@ -75,9 +74,6 @@ namespace dnSpy.MCP.Server.Presentation {
 		bool enableFileLogging = true;
 		bool enableOutputPaneLogging = true;
 		bool enableToolCallLogging = true;
-		string de4dotExePath = string.Empty;
-		string de4dotSearchPathsText = string.Empty;
-		int de4dotMaxSearchDepth = 6;
 
 		public McpOptionsPageViewModel(McpToolWindowViewModel sharedViewModel) {
 			this.sharedViewModel = sharedViewModel;
@@ -223,36 +219,6 @@ namespace dnSpy.MCP.Server.Presentation {
 			}
 		}
 
-		public string De4dotExePath {
-			get => de4dotExePath;
-			set {
-				if (de4dotExePath != value) {
-					de4dotExePath = value;
-					OnPropertyChanged(nameof(De4dotExePath));
-				}
-			}
-		}
-
-		public string De4dotSearchPathsText {
-			get => de4dotSearchPathsText;
-			set {
-				if (de4dotSearchPathsText != value) {
-					de4dotSearchPathsText = value;
-					OnPropertyChanged(nameof(De4dotSearchPathsText));
-				}
-			}
-		}
-
-		public int De4dotMaxSearchDepth {
-			get => de4dotMaxSearchDepth;
-			set {
-				if (de4dotMaxSearchDepth != value) {
-					de4dotMaxSearchDepth = value;
-					OnPropertyChanged(nameof(De4dotMaxSearchDepth));
-				}
-			}
-		}
-
 		public void Apply() {
 			CopyEditorStateToSharedViewModel();
 			sharedViewModel.SaveConfiguration();
@@ -315,9 +281,6 @@ namespace dnSpy.MCP.Server.Presentation {
 			EnableFileLogging = cfg.EnableFileLogging;
 			EnableOutputPaneLogging = cfg.EnableOutputPaneLogging;
 			EnableToolCallLogging = cfg.EnableToolCallLogging;
-			De4dotExePath = cfg.De4dotExePath;
-			De4dotSearchPathsText = string.Join(Environment.NewLine, cfg.De4dotSearchPaths ?? Enumerable.Empty<string>());
-			De4dotMaxSearchDepth = cfg.De4dotMaxSearchDepth;
 		}
 
 		void CopyEditorStateToSharedViewModel() {
@@ -334,9 +297,6 @@ namespace dnSpy.MCP.Server.Presentation {
 			sharedViewModel.EnableFileLogging = EnableFileLogging;
 			sharedViewModel.EnableOutputPaneLogging = EnableOutputPaneLogging;
 			sharedViewModel.EnableToolCallLogging = EnableToolCallLogging;
-			sharedViewModel.De4dotExePath = De4dotExePath;
-			sharedViewModel.De4dotSearchPathsText = De4dotSearchPathsText;
-			sharedViewModel.De4dotMaxSearchDepth = De4dotMaxSearchDepth;
 		}
 
 		void SharedViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e) {

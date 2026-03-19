@@ -13,9 +13,18 @@
 - **Streamable HTTP transport**: the server now exposes streamable HTTP on `POST /mcp` as the primary MCP endpoint for modern clients, while legacy SSE remains available for older integrations.
 - **Code-mode-first MCP bootstrap**: `tools/list` now starts narrow and exposes staged discovery through `dnspy_search_tools`, `dnspy_get_tool_schemas`, tool groups, and constrained `dnspy_execute_code`.
 - **Expanded reconstruction surface**: major additions across source recovery, metadata and native inspection, deobfuscation triage, provenance correlation, symbol/source matching, and project export.
+- **de4dot dependency cleanup**: the bundled de4dot DLLs were replaced with a pinned `de4dotEx` submodule build, and the old external `de4dot.exe` runner/config surface was removed.
+- **Net10-only build path**: MCP build, NUKE targets, host build flow, and setup guidance now target `net10.0-windows` only; the repo no longer carries net48 support workarounds such as the old theme post-copy path.
 - **dnSpy host integration**: new UI-navigation tools let MCP clients inspect the selected node, focus debugger context, follow references, and select document nodes directly in the dnSpy UI.
-- **Integrated MCP settings UI**: host, port, logging, de4dot paths, and related settings are now managed from `Options -> MCP Server`.
+- **Integrated MCP settings UI**: host, port, logging, and related settings are now managed from `Options -> MCP Server`.
 - **Build and setup cleanup**: `build.bat` is now the intended entry point for repairing the dnSpy checkout, building the host, and producing the MCP extension outputs.
+
+### Build and packaging
+
+- Added a pinned `de4dotEx` submodule and build-time staging of `AssemblyData.dll`, `de4dot.blocks.dll`, `de4dot.code.dll`, `de4dot.cui.dll`, and `de4dot.mdecrypt.dll` into `libs/de4dot-net8/`.
+- Removed checked-in de4dot binary payloads from `libs/de4dot/` and `libs/de4dot-net8/`.
+- Removed the external `dnspy_run_de4dot` path in favor of the in-process de4dot integration only.
+- Simplified the repo build surface to net10-only entrypoints and outputs.
 
 ### Documentation
 

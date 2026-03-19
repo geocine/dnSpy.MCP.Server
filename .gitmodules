@@ -1,3 +1,6 @@
 [submodule "dnSpy"]
 	path = dnSpy
 	url = https://github.com/dnSpyEx/dnSpy.git
+[submodule "de4dotEx"]
+	path = de4dotEx
+	url = https://github.com/GDATAAdvancedAnalytics/de4dotEx.git

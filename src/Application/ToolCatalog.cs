@@ -203,7 +203,6 @@ namespace dnSpy.MCP.Server.Application {
 			"remove_exception_breakpoint",
 			"deobfuscate_assembly",
 			"save_deobfuscated",
-			"run_de4dot",
 			"run_script",
 			"close_dialog",
 			"export_to_project",
@@ -249,7 +248,6 @@ namespace dnSpy.MCP.Server.Application {
 			"start_debugging",
 			"attach_to_process",
 			"eval_expression",
-			"run_de4dot",
 			"deobfuscate_assembly",
 			"save_deobfuscated",
 			"run_script",
@@ -289,7 +287,6 @@ namespace dnSpy.MCP.Server.Application {
 			"remove_exception_breakpoint",
 			"deobfuscate_assembly",
 			"save_deobfuscated",
-			"run_de4dot",
 			"run_script",
 			"close_dialog",
 			"export_to_project",
@@ -372,7 +369,7 @@ namespace dnSpy.MCP.Server.Application {
 				"get_ssa" or "emulate_method" =>
 					"metadata_and_native",
 
-				"run_de4dot" or "list_deobfuscators" or "detect_obfuscator" or "deobfuscate_assembly" or
+				"list_deobfuscators" or "detect_obfuscator" or "deobfuscate_assembly" or
 				"save_deobfuscated" or "analyze_static_constructors" or "find_reflection_usage" or
 				"suggest_symbol_renames" or "detect_anti_debug" or "detect_anti_tamper" or
 				"find_proxy_methods" or "detect_string_encryption" or "find_delegate_creation" or

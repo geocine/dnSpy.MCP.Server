@@ -47,20 +47,6 @@ namespace dnSpy.MCP.Server.Configuration
         public bool EnableServer { get; set; } = true;
 
         /// <summary>
-        /// Absolute path to de4dot.exe.  Leave empty to use auto-discovery.
-        /// Example: "C:/tools/de4dot/de4dot.exe"
-        /// </summary>
-        [JsonPropertyName("de4dotExePath")]
-        public string De4dotExePath { get; set; } = "";
-
-        /// <summary>
-        /// Extra directories to search for de4dot.exe when de4dotExePath is empty.
-        /// Paths are tried in order; relative paths are resolved from the config file's directory.
-        /// </summary>
-        [JsonPropertyName("de4dotSearchPaths")]
-        public List<string> De4dotSearchPaths { get; set; } = new List<string>();
-
-        /// <summary>
         /// Hostname or IP address the MCP server listens on.
         /// Use "localhost" (default) for local-only access.
         /// Use "0.0.0.0" or "+" to listen on all interfaces — required for remote debugging
@@ -134,14 +120,6 @@ namespace dnSpy.MCP.Server.Configuration
         /// </summary>
         [JsonPropertyName("enableToolCallLogging")]
         public bool EnableToolCallLogging { get; set; } = true;
-
-        /// <summary>
-        /// Maximum directory levels to search upward for a sibling de4dot repository when
-        /// de4dotExePath is empty and the exe is not found next to the DLL.
-        /// Default 6. Increase if your repo is nested deeper.
-        /// </summary>
-        [JsonPropertyName("de4dotMaxSearchDepth")]
-        public int De4dotMaxSearchDepth { get; set; } = 6;
 
         // ── Singleton ─────────────────────────────────────────────────────────
 
@@ -224,67 +202,6 @@ namespace dnSpy.MCP.Server.Configuration
         public void Save()
         {
             Save(ConfigFilePath);
-        }
-
-        // ── de4dot resolution ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// Resolves the path to de4dot.exe using config + well-known fallbacks.
-        /// Returns null if de4dot cannot be found.
-        /// </summary>
-        public string? ResolveDe4dotExe()
-        {
-            // 1. Explicit path in config
-            if (!string.IsNullOrEmpty(De4dotExePath) && File.Exists(De4dotExePath))
-                return De4dotExePath;
-
-            var configDir = Path.GetDirectoryName(ConfigFilePath) ?? "";
-
-            // 2. User-supplied search paths (config-relative or absolute)
-            foreach (var raw in De4dotSearchPaths)
-            {
-                if (string.IsNullOrWhiteSpace(raw)) continue;
-                var p = Path.IsPathRooted(raw) ? raw : Path.GetFullPath(Path.Combine(configDir, raw));
-                if (File.Exists(p)) return p;
-            }
-
-            // 3. de4dot.exe in the same directory as the DLL
-            var nextToDll = Path.Combine(configDir, "de4dot.exe");
-            if (File.Exists(nextToDll)) return nextToDll;
-
-            // 4. Sibling de4dot repo (dev environment heuristic):
-            //    DLL lives at <repo>/dnSpy/dnSpy/bin/<config>/<tfm>/
-            //    de4dot lives at <parent-of-repo>/../de4dot/Debug/net48/
-            try
-            {
-                // Walk up to find the repo root (contains .git or dnSpy subdir)
-                var dir = configDir;
-                int depth = De4dotMaxSearchDepth > 0 ? De4dotMaxSearchDepth : 6;
-                for (int i = 0; i < depth && !string.IsNullOrEmpty(dir); i++)
-                {
-                    var candidate = Path.GetFullPath(Path.Combine(dir, "..", "de4dot", "Debug", "net48", "de4dot.exe"));
-                    if (File.Exists(candidate)) return candidate;
-                    dir = Path.GetDirectoryName(dir);
-                }
-            }
-            catch { }
-
-            // 5. Same path structure but on common Windows drive letters (D:\, E:\, etc.)
-            //    for cases where repos are on a different drive than the running binary
-            try
-            {
-                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                if (!string.IsNullOrEmpty(userProfile))
-                {
-                    // Try <USERPROFILE>\source\repos\de4dot\Debug\net48\de4dot.exe
-                    var reposBase = Path.Combine(userProfile, "source", "repos");
-                    var candidate = Path.Combine(reposBase, "de4dot", "Debug", "net48", "de4dot.exe");
-                    if (File.Exists(candidate)) return candidate;
-                }
-            }
-            catch { }
-
-            return null;
         }
     }
 }

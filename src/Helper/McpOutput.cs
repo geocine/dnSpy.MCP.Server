@@ -397,7 +397,6 @@ namespace dnSpy.MCP.Server.Helper {
 			LogService<ScriptTools>(serviceLocator);
 			LogService<WindowTools>(serviceLocator);
 			LogService<De4dotTools>(serviceLocator);
-			LogService<De4dotExeTool>(serviceLocator);
 		}
 
 		static void LogService<T>(IServiceLocator serviceLocator) where T : class {
