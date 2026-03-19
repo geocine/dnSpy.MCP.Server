@@ -4,7 +4,11 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server embedd
 
 > Fork note: this repository is forked from [chichicaste/dnSpy.MCP.Server](https://github.com/chichicaste/dnSpy.MCP.Server).
 
-**Version**: 1.7.0 | **Tools**: 102 | **Status**: beta2 | **Targets**: .NET 4.8 + .NET 10.0-windows
+**Version**: 2.0.0 | **Status**: v2 reconstruction branch | **Targets**: .NET 4.8 + .NET 10.0-windows
+
+> **v2 workstream**: the `feature/dnspy-mcp-v2` branch tracks the rebuild plan in `docs/dnspy-mcp-v2-plan.md`.
+> **Current v2 API direction**: public MCP tool names are being standardized to `dnspy_*`. Legacy skill-storage tools and server-config tools are not part of the public surface.
+> **v2 product direction**: the server is being refocused around software reconstruction from .NET binaries: decompilation, project/resource recovery, architecture analysis, deobfuscation, known-binary/source correlation, and runtime-assisted recovery by controlling dnSpy's own host UI state when static analysis is insufficient. A concrete success case is reconstructing how a game reads a custom asset format, turns it into runtime objects, renders it, and packs or saves it again, even when symbol names are obfuscated.
 
 ---
 
@@ -390,64 +394,6 @@ Read, write, and extract entries from the ManifestResource table. All write oper
 
 ---
 
-### Skills Knowledge Base
-
-A persistent reverse-engineering knowledge base stored in `%APPDATA%\dnSpy\dnSpy.MCPServer\skills\`. Each skill is a pair of files: a Markdown narrative (`{id}.md`) and a JSON technical record (`{id}.json`). Skills capture step-by-step procedures, magic values, crypto keys, algorithms, offsets, and generic prompts — so once you've reversed a packer or obfuscator, the knowledge is reusable.
-
-**Workflow**: Before analysing a new binary, call `search_skills` to check for existing knowledge. After completing an analysis, call `save_skill` to record findings.
-
-| Tool | Description | Required params | Optional params |
-|------|-------------|-----------------|-----------------|
-| `list_skills` | List all skills in the knowledge base with ID, name, description, tags, and targets | — | `tag` |
-| `get_skill` | Retrieve the full Markdown narrative and JSON technical record of a skill | `skill_id` | — |
-| `save_skill` | Create or update a skill. Writes Markdown and/or JSON. Use `merge=true` to append findings without overwriting existing data | `skill_id` | `name`, `description`, `tags`, `targets`, `markdown`, `json_data`, `merge` |
-| `search_skills` | Full-text search across all skill Markdown and JSON files. Returns matches with context snippets | `query` or `tag` | `query`, `tag` |
-| `delete_skill` | Permanently delete a skill (both `.md` and `.json` files) | `skill_id` | — |
-
-#### Parameter details
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `skill_id` | string | Skill identifier — will be slugified (e.g. `confuserex-unpacking`). Use `list_skills` to see existing IDs |
-| `name` | string | Human-readable skill name |
-| `description` | string | Short summary of what the skill covers |
-| `tags` | string | Comma-separated or JSON array of tags (e.g. `packer,confuserex,unpacking`) |
-| `targets` | string | Comma-separated or JSON array of target binary names or hashes this skill applies to |
-| `markdown` | string | Markdown narrative: what to do, why, key observations, procedure steps in prose |
-| `json_data` | string | JSON object with technical details: `procedure` (steps with `tool`/`prompt`/`expected`), `magic_values`, `crypto_keys`, `algorithms`, `offsets`, `findings`, `prompts` (identify/apply/verify/troubleshoot) |
-| `merge` | boolean | If `true`, deep-merge `json_data` into the existing record instead of replacing it (default `false`) |
-| `query` | string | (`search_skills`) Keyword or phrase to search for in all skill files |
-| `tag` | string | (`list_skills`, `search_skills`) Filter results to skills containing this tag substring |
-
-#### Example JSON skill record structure
-
-```json
-{
-  "id": "confuserex-unpacking",
-  "name": "ConfuserEx Unpacking",
-  "version": "1",
-  "tags": ["packer", "confuserex", "unpacking"],
-  "targets": ["MyProtectedApp.exe"],
-  "description": "Step-by-step procedure to unpack ConfuserEx 1.x protected assemblies",
-  "procedure": [
-    { "step": 1, "tool": "detect_obfuscator", "prompt": "Detect which obfuscator was applied", "expected": "ConfuserEx v1.x" },
-    { "step": 2, "tool": "start_debugging",   "prompt": "Launch under dnSpy with break_kind=EntryPoint", "expected": "Paused at entry point after .cctor" },
-    { "step": 3, "tool": "dump_module_from_memory", "prompt": "Dump decrypted module from RAM", "expected": "Raw PE bytes" }
-  ],
-  "magic_values": { "key_offset": "0x1234", "xor_key": "0xDEADBEEF" },
-  "crypto_keys": [],
-  "algorithms": ["XOR", "AES-128-ECB"],
-  "prompts": {
-    "identify": "Use detect_obfuscator on the assembly. If ConfuserEx, proceed with this skill.",
-    "apply": "Follow procedure steps 1-3. After dump, reload and deobfuscate.",
-    "verify": "Decompile Main() — if readable C# appears, unpacking succeeded.",
-    "troubleshoot": "If dump_module_from_memory fails, try dump_module_unpacked with fix_pe_header=true."
-  }
-}
-```
-
----
-
 ### Debug Tools
 
 Interact with dnSpy's integrated debugger. Most tools require an active debug session.
@@ -650,9 +596,9 @@ Enumerate and dismiss dialog boxes (Win32 `MessageBox`, `#32770` dialogs, and WP
 
 | Tool | Description | Required params |
 |------|-------------|-----------------|
-| `list_tools` | Return the full schema for every registered tool as JSON | — |
-| `get_mcp_config` | Return the current MCP server configuration and the path to `mcp-config.json` | — |
-| `reload_mcp_config` | Reload `mcp-config.json` from disk without restarting dnSpy | — |
+| `dnspy_list_tools` | Return the full schema for every registered public tool as JSON | - |
+| `dnspy_status` | Return server status and the current registered tool count | - |
+| `dnspy_get_server_stats` | Return aggregate catalog stats and service availability | - |
 
 ---
 
@@ -852,7 +798,6 @@ To fetch the next page, pass the `nextCursor` value as the `cursor` argument in 
 | `src/Application/UsageFindingCommandTools.cs` | Cross-assembly IL usage analysis (callers, field reads/writes) |
 | `src/Application/CodeAnalysisHelpers.cs` | Static call-graph, dependency chain, dead code analysis |
 | `src/Application/De4dotTools.cs` | de4dot in-process integration; available in all builds |
-| `src/Application/SkillsTools.cs` | Persistent skills knowledge base (Markdown + JSON) in `%APPDATA%\dnSpy\dnSpy.MCPServer\skills\` |
 | `src/Application/ScriptTools.cs` | Roslyn C# scripting (`run_script`) |
 | `src/Application/WindowTools.cs` | Win32 + WPF dialog enumeration and dismissal |
 | `src/Presentation/TheExtension.cs` | MEF entry point, server lifecycle |
@@ -879,7 +824,6 @@ dnSpy.MCP.Server/
     │   ├── UsageFindingCommandTools.cs  # IL usage analysis
     │   ├── CodeAnalysisHelpers.cs   # Call-graph & dependency analysis
     │   ├── De4dotTools.cs           # de4dot deobfuscation (all builds)
-    │   ├── SkillsTools.cs           # Skills knowledge base (MD + JSON)
     │   ├── ScriptTools.cs           # Roslyn C# scripting
     │   ├── WindowTools.cs           # Win32/WPF dialog management
     │   └── McpTools.cs              # Tool registry & routing
@@ -934,7 +878,7 @@ A `mcp-config.json` file is created automatically next to the MCP Server DLL on 
 > ```
 > Then point your MCP client at `http://<dnspy-machine-ip>:3100/mcp`.
 
-After editing `mcp-config.json`, call `reload_mcp_config` or restart dnSpy to apply the changes.
+After editing `mcp-config.json`, restart dnSpy to apply the changes.
 
 ### Verify the server is running
 
@@ -979,13 +923,13 @@ netstat -ano | findstr :3100
 
 1. Fork or branch from `master`
 2. Implement your changes under `src/Application/` or `src/Communication/`
-3. Register new tools in `McpTools.cs` (`GetAvailableTools` + `ExecuteTool` switch)
+3. Prefer the shared tool catalog and response helpers for new MCP tool work. Only extend the legacy switch/registry path when touching migration glue.
 4. Build with `dotnet build … --nologo` — must produce **0 errors, 0 warnings**
-5. Manually test via any MCP client (`list_tools` to verify registration)
+5. Manually test via any MCP client (`dnspy_list_tools` to verify registration)
 6. Submit a PR with a description of the new tool(s) and their parameters
 
 ---
 
 ## License
 
-GNU General Public License v3.0 — see [LICENSE](LICENSE) for details.
+GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.

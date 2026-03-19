@@ -67,6 +67,7 @@ namespace dnSpy.MCP.Server.Presentation {
 		/// </summary>
 		public ExtensionInfo ExtensionInfo => new ExtensionInfo {
 			ShortDescription = "MCP Server for AI-assisted .NET assembly analysis and BepInEx plugin development",
+			Copyright = "Copyright (C) 2026 @chichicaste, @geocine",
 		};
 
 		/// <summary>
