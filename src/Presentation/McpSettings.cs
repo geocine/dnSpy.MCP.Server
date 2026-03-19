@@ -18,20 +18,17 @@
 */
 
 using System;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
-using System.IO;
 using dnSpy.Contracts.MVVM;
-using dnSpy.Contracts.Settings;
-using dnSpy.Contracts.Text;
-
 using dnSpy.MCP.Server.Communication;
+using dnSpy.MCP.Server.Configuration;
 using dnSpy.MCP.Server.Helper;
 
 namespace dnSpy.MCP.Server.Presentation {
 	/// <summary>
-	/// Settings for the MCP server extension, including server configuration and logging.
+	/// Runtime settings for the MCP server extension.
+	/// Values are hydrated from mcp-config.json and kept in sync with it.
 	/// </summary>
 	public class McpSettings : ViewModelBase {
 		/// <summary>
@@ -86,112 +83,27 @@ namespace dnSpy.MCP.Server.Presentation {
 		int port = 3100;
 
 		/// <summary>
-		/// Gets the collection of log messages (limited to last 100 messages).
+		/// Log an informational message.
 		/// </summary>
-		public ObservableCollection<string> LogMessages { get; } = new ObservableCollection<string>();
-
-		/// <summary>
-		/// Gets or sets the combined log text for easy copying.
-		/// </summary>
-		string logText = string.Empty;
-		public string LogText {
-			get => logText;
-			set {
-				if (logText != value) {
-					logText = value;
-					OnPropertyChanged(nameof(LogText));
-				}
-			}
-		}
-
-		/// <summary>
-		/// Adds a log message to the log collection and forwards it to the centralized logger.
-		/// </summary>
-		/// <param name="message">The log message to add.</param>
-		public void Log(string message) {
-			// Use centralized logger (includes timestamp and file logging)
-			McpLogger.Info(message);
-
-			// Keep and update the in-UI log collection (used by the settings UI).
-			var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-			var logEntry = $"[{timestamp}] {message}";
-
-			if (System.Windows.Application.Current?.Dispatcher != null) {
-				System.Windows.Application.Current.Dispatcher.Invoke(() => {
-					LogMessages.Add(logEntry);
-					while (LogMessages.Count > 100)
-						LogMessages.RemoveAt(0);
-					LogText = string.Join(Environment.NewLine, LogMessages);
-				});
-			} else {
-				LogMessages.Add(logEntry);
-				while (LogMessages.Count > 100)
-					LogMessages.RemoveAt(0);
-				LogText = string.Join(Environment.NewLine, LogMessages);
-			}
-		}
+		public void Log(string message) => McpLogger.Info(message);
 
 		/// <summary>
 		/// Log an informational message.
 		/// </summary>
-		public void LogInfo(string message) {
-			McpLogger.Info(message);
-			AddToUILog("INFO", message);
-		}
+		public void LogInfo(string message) => McpLogger.Info(message);
 
 		/// <summary>
 		/// Log a warning message.
 		/// </summary>
-		public void LogWarn(string message) {
-			McpLogger.Warning(message);
-			AddToUILog("WARN", message);
-		}
+		public void LogWarn(string message) => McpLogger.Warning(message);
 
 		/// <summary>
 		/// Log an error message.
 		/// </summary>
-		public void LogError(string message) {
-			McpLogger.Error(message);
-			AddToUILog("ERROR", message);
-		}
+		public void LogError(string message) => McpLogger.Error(message);
 
-		/// <summary>
-		/// Adds a message to the UI log collection.
-		/// </summary>
-		void AddToUILog(string level, string message) {
-			var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-			var logEntry = $"[{timestamp}] [{level}] {message}";
+		public void ClearLogs() => McpLogger.ClearInMemoryMessages();
 
-			if (System.Windows.Application.Current?.Dispatcher != null) {
-				System.Windows.Application.Current.Dispatcher.Invoke(() => {
-					LogMessages.Add(logEntry);
-					while (LogMessages.Count > 100)
-						LogMessages.RemoveAt(0);
-					LogText = string.Join(Environment.NewLine, LogMessages);
-				});
-			} else {
-				LogMessages.Add(logEntry);
-				while (LogMessages.Count > 100)
-					LogMessages.RemoveAt(0);
-				LogText = string.Join(Environment.NewLine, LogMessages);
-			}
-		}
-
-		/// <summary>
-		/// Clears all log messages from the UI.
-		/// </summary>
-		public void ClearLogs() {
-			// Clear on UI thread if available
-			if (System.Windows.Application.Current?.Dispatcher != null) {
-				System.Windows.Application.Current.Dispatcher.Invoke(() => {
-					LogMessages.Clear();
-					LogText = string.Empty;
-				});
-			} else {
-				LogMessages.Clear();
-				LogText = string.Empty;
-			}
-		}
 		/// <summary>
 		/// Creates a copy of these settings.
 		/// </summary>
@@ -213,27 +125,14 @@ namespace dnSpy.MCP.Server.Presentation {
 	/// </summary>
 	[Export(typeof(McpSettings))]
 	sealed class McpSettingsImpl : McpSettings {
-		static readonly Guid SETTINGS_GUID = new Guid("352907A0-9DF5-4B2B-B47B-95E504CAC301");
-
-		readonly ISettingsService settingsService;
 		McpServer? mcpServer;
 
 		[ImportingConstructor]
-		McpSettingsImpl(ISettingsService settingsService) {
-			this.settingsService = settingsService;
-
-			// Host and Port are read from mcp-config.json so that the bind address can be
-			// changed by editing that file without touching dnSpy's internal settings.
-			// The JSON config file is created with defaults on first run if it does not exist.
-			var cfg = Configuration.McpConfig.Instance;
+		McpSettingsImpl() {
+			var cfg = McpConfig.Instance;
+			EnableServer = cfg.EnableServer;
 			Host = cfg.Host;
 			Port = cfg.Port;
-
-			// EnableServer is the only property persisted in dnSpy's own settings store
-			// (it controls the on/off toggle in the UI and survives dnSpy restarts).
-			var sect = settingsService.GetOrCreateSection(SETTINGS_GUID);
-			EnableServer = sect.Attribute<bool?>(nameof(EnableServer)) ?? EnableServer;
-
 			PropertyChanged += McpSettingsImpl_PropertyChanged;
 		}
 
@@ -249,48 +148,52 @@ namespace dnSpy.MCP.Server.Presentation {
 		}
 
 		void McpSettingsImpl_PropertyChanged(object? sender, PropertyChangedEventArgs e) {
-			// Only EnableServer is persisted — Host and Port are owned by mcp-config.json
-			var sect = settingsService.RecreateSection(SETTINGS_GUID);
-			sect.Attribute(nameof(EnableServer), EnableServer);
+			PersistRuntimeSettings();
 
-			// Handle server enable/disable dynamically (no restart required)
-			if (e.PropertyName == nameof(EnableServer) && mcpServer != null) {
-				if (EnableServer) {
-					Log("Starting MCP server");
-					mcpServer.Start();
+			if (e.PropertyName != nameof(EnableServer) || mcpServer == null)
+				return;
 
-					// Verify asynchronously that the server started and report to output
-					System.Threading.Tasks.Task.Run(async () => {
-						await System.Threading.Tasks.Task.Delay(300);
-						try {
-							if (mcpServer.IsRunning)
-								Log("MCP server is running");
-							else
-								Log("MCP server failed to start");
-						}
-						catch (Exception ex) {
-							Log($"Error checking server status: {ex.Message}");
-						}
-					});
-				} else {
-					Log("Stopping MCP server");
-					mcpServer.Stop();
-
-					// Verify asynchronously that the server stopped and report to output
-					System.Threading.Tasks.Task.Run(async () => {
-						await System.Threading.Tasks.Task.Delay(200);
-						try {
-							if (mcpServer.IsRunning)
-								Log("MCP server is still running");
-							else
-								Log("MCP server stopped");
-						}
-						catch (Exception ex) {
-							Log($"Error checking server status: {ex.Message}");
-						}
-					});
-				}
+			if (EnableServer) {
+				Log("Starting MCP server");
+				mcpServer.Start();
+				VerifyServerStateAsync(expectedRunning: true);
 			}
+			else {
+				Log("Stopping MCP server");
+				mcpServer.Stop();
+				VerifyServerStateAsync(expectedRunning: false);
+			}
+		}
+
+		void PersistRuntimeSettings() {
+			try {
+				var cfg = McpConfig.Instance;
+				cfg.EnableServer = EnableServer;
+				cfg.Host = Host;
+				cfg.Port = Port;
+				cfg.Save();
+			}
+			catch (Exception ex) {
+				McpLogger.Exception(ex, "Failed to persist MCP runtime settings");
+			}
+		}
+
+		void VerifyServerStateAsync(bool expectedRunning) {
+			System.Threading.Tasks.Task.Run(async () => {
+				await System.Threading.Tasks.Task.Delay(expectedRunning ? 300 : 200);
+				try {
+					if (mcpServer == null)
+						return;
+
+					if (expectedRunning)
+						Log(mcpServer.IsRunning ? "MCP server is running" : "MCP server failed to start");
+					else
+						Log(mcpServer.IsRunning ? "MCP server is still running" : "MCP server stopped");
+				}
+				catch (Exception ex) {
+					Log($"Error checking server status: {ex.Message}");
+				}
+			});
 		}
 	}
 }

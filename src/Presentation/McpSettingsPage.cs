@@ -1,7 +1,7 @@
 /*
     Copyright (C) 2026 @chichicaste
 
-    This file is part of dnSpy MCP Server module. 
+    This file is part of dnSpy MCP Server module.
 
     dnSpy MCP Server is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,168 +19,334 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.Composition;
-using dnSpy.Contracts.Images;
+using System.Linq;
+using dnSpy.Contracts.MVVM;
 using dnSpy.Contracts.Settings.Dialog;
+using dnSpy.MCP.Server.Configuration;
 
 namespace dnSpy.MCP.Server.Presentation {
-	/// <summary>
-	/// Provider for the MCP server settings page in dnSpy settings dialog.
-	/// </summary>
 	[Export(typeof(IAppSettingsPageProvider))]
 	sealed class McpAppSettingsPageProvider : IAppSettingsPageProvider {
-		readonly McpSettings mcpSettings;
+		readonly McpToolWindowViewModel sharedViewModel;
 
-		/// <summary>
-		/// Initializes the settings page provider.
-		/// </summary>
 		[ImportingConstructor]
-		McpAppSettingsPageProvider(McpSettings mcpSettings) => this.mcpSettings = mcpSettings;
+		McpAppSettingsPageProvider(McpToolWindowViewModel sharedViewModel) => this.sharedViewModel = sharedViewModel;
 
-		/// <summary>
-		/// Creates the settings page.
-		/// </summary>
 		public IEnumerable<AppSettingsPage> Create() {
-			yield return new McpAppSettingsPage(mcpSettings);
+			yield return new McpAppSettingsPage(sharedViewModel);
 		}
 	}
 
-	/// <summary>
-	/// Settings page for the MCP server in dnSpy settings dialog.
-	/// </summary>
 	sealed class McpAppSettingsPage : AppSettingsPage {
-		static readonly Guid THE_GUID = new Guid("68F555EB-A951-49C1-9708-C8756A5FAC39");
+		internal static readonly Guid PageGuid = new Guid("68F555EB-A951-49C1-9708-C8756A5FAC39");
 
-		/// <summary>
-		/// Gets the parent settings page GUID (none for top-level page).
-		/// </summary>
-		public override Guid ParentGuid => Guid.Empty;
-
-		/// <summary>
-		/// Gets the unique GUID for this settings page.
-		/// </summary>
-		public override Guid Guid => THE_GUID;
-
-		/// <summary>
-		/// Gets the display order in the settings tree.
-		/// </summary>
-		public override double Order => AppSettingsConstants.ORDER_DEBUGGER + 0.2;
-
-		/// <summary>
-		/// Gets the page title displayed in settings.
-		/// </summary>
-		public override string Title => "MCP Server";
-
-		/// <summary>
-		/// Gets the icon displayed next to the page title.
-		/// </summary>
-		//public override ImageReference Icon => DsImages.MarkupTag;
-
-		/// <summary>
-		/// Gets the UI control for this settings page.
-		/// </summary>
-		public override object? UIObject {
-			get {
-				if (uiObject is null) {
-					uiObject = new McpSettingsControl();
-					// Use a wrapper that combines editable settings with live logs from global settings
-					uiObject.DataContext = new SettingsViewModel(newSettings, globalSettings);
-				}
-				return uiObject;
-			}
-		}
+		readonly McpOptionsPageViewModel viewModel;
 		McpSettingsControl? uiObject;
 
-		readonly McpSettings globalSettings;
-		readonly McpSettings newSettings;
+		public override Guid ParentGuid => Guid.Empty;
+		public override Guid Guid => PageGuid;
+		public override double Order => AppSettingsConstants.ORDER_DEBUGGER + 0.2;
+		public override string Title => "MCP Server";
+		public override object? UIObject => uiObject ??= new McpSettingsControl { DataContext = viewModel };
 
-		/// <summary>
-		/// Initializes the settings page with the given settings instance.
-		/// </summary>
-		public McpAppSettingsPage(McpSettings mcpSettings) {
-			globalSettings = mcpSettings;
-			newSettings = mcpSettings.Clone();
-		}
+		public McpAppSettingsPage(McpToolWindowViewModel sharedViewModel) => viewModel = new McpOptionsPageViewModel(sharedViewModel);
 
-		/// <summary>
-		/// Applies the settings when user clicks OK.
-		/// </summary>
-		public override void OnApply() =>
-			newSettings.CopyTo(globalSettings);
+		public override void OnApply() => viewModel.Apply();
 
-		/// <summary>
-		/// Called when the settings dialog is closed.
-		/// </summary>
-		public override void OnClosed() {
-		}
+		public override void OnClosed() => viewModel.Dispose();
 	}
 
-	/// <summary>
-	/// View model for MCP settings that provides editable settings while showing live logs from global settings.
-	/// This allows users to see real-time logs even before applying settings changes.
-	/// </summary>
-	public class SettingsViewModel : dnSpy.Contracts.MVVM.ViewModelBase {
-		readonly McpSettings editableSettings;
-		readonly McpSettings globalSettings;
+	sealed class McpOptionsPageViewModel : ViewModelBase, IMcpSettingsActionHandler, IDisposable {
+		readonly McpToolWindowViewModel sharedViewModel;
 
-		/// <summary>
-		/// Initializes the view model with editable and global settings instances.
-		/// </summary>
-		public SettingsViewModel(McpSettings editable, McpSettings global) {
-			editableSettings = editable;
-			globalSettings = global;
+		bool enableServer;
+		string host = "localhost";
+		int port = 3100;
+		bool requireApiKey;
+		string apiKey = string.Empty;
+		bool enableRunScript;
+		bool exposeFullToolCatalog;
+		bool allowImplicitDefaultSession = true;
+		string implicitDefaultSessionId = "__implicit_http_session__";
+		string logLevel = "Info";
+		bool enableFileLogging = true;
+		bool enableOutputPaneLogging = true;
+		bool enableToolCallLogging = true;
+		string de4dotExePath = string.Empty;
+		string de4dotSearchPathsText = string.Empty;
+		int de4dotMaxSearchDepth = 6;
 
-			// Forward property change notifications from editable settings
-			editableSettings.PropertyChanged += (s, e) => OnPropertyChanged(e.PropertyName ?? string.Empty);
-
-			// Forward property change notifications from global settings (for live logs)
-			globalSettings.PropertyChanged += (s, e) => {
-				if (e.PropertyName == nameof(LogText) || e.PropertyName == nameof(LogMessages)) {
-					OnPropertyChanged(e.PropertyName);
-				}
-			};
+		public McpOptionsPageViewModel(McpToolWindowViewModel sharedViewModel) {
+			this.sharedViewModel = sharedViewModel;
+			LoadFrom(McpConfig.Instance);
+			sharedViewModel.PropertyChanged += SharedViewModel_PropertyChanged;
 		}
 
-		/// <summary>
-		/// Gets or sets whether the MCP server is enabled (editable).
-		/// </summary>
+		public IEnumerable<string> AvailableLogLevels => sharedViewModel.AvailableLogLevels;
+		public string ConfigFilePath => sharedViewModel.ConfigFilePath;
+		public string LogFilePath => sharedViewModel.LogFilePath;
+		public string StatusMessage => sharedViewModel.StatusMessage;
+		public string LogText => sharedViewModel.LogText;
+		public bool IsServerRunning => sharedViewModel.IsServerRunning;
+		public string PrimaryServerActionLabel => sharedViewModel.PrimaryServerActionLabel;
+
 		public bool EnableServer {
-			get => editableSettings.EnableServer;
-			set => editableSettings.EnableServer = value;
+			get => enableServer;
+			set {
+				if (enableServer != value) {
+					enableServer = value;
+					OnPropertyChanged(nameof(EnableServer));
+				}
+			}
 		}
 
-		/// <summary>
-		/// Gets or sets the server host (editable).
-		/// </summary>
 		public string Host {
-			get => editableSettings.Host;
-			set => editableSettings.Host = value;
+			get => host;
+			set {
+				if (host != value) {
+					host = value;
+					OnPropertyChanged(nameof(Host));
+				}
+			}
 		}
 
-		/// <summary>
-		/// Gets or sets the server port (editable).
-		/// </summary>
 		public int Port {
-			get => editableSettings.Port;
-			set => editableSettings.Port = value;
+			get => port;
+			set {
+				if (port != value) {
+					port = value;
+					OnPropertyChanged(nameof(Port));
+				}
+			}
 		}
 
-		/// <summary>
-		/// Gets the live log messages from global settings.
-		/// </summary>
-		public System.Collections.ObjectModel.ObservableCollection<string> LogMessages => globalSettings.LogMessages;
+		public bool RequireApiKey {
+			get => requireApiKey;
+			set {
+				if (requireApiKey != value) {
+					requireApiKey = value;
+					OnPropertyChanged(nameof(RequireApiKey));
+				}
+			}
+		}
 
-		/// <summary>
-		/// Gets the live combined log text from global settings.
-		/// </summary>
-		public string LogText => globalSettings.LogText;
-		
-		/// <summary>
-		/// Clears all log messages from global settings.
-		/// </summary>
+		public string ApiKey {
+			get => apiKey;
+			set {
+				if (apiKey != value) {
+					apiKey = value;
+					OnPropertyChanged(nameof(ApiKey));
+				}
+			}
+		}
+
+		public bool EnableRunScript {
+			get => enableRunScript;
+			set {
+				if (enableRunScript != value) {
+					enableRunScript = value;
+					OnPropertyChanged(nameof(EnableRunScript));
+				}
+			}
+		}
+
+		public bool ExposeFullToolCatalog {
+			get => exposeFullToolCatalog;
+			set {
+				if (exposeFullToolCatalog != value) {
+					exposeFullToolCatalog = value;
+					OnPropertyChanged(nameof(ExposeFullToolCatalog));
+				}
+			}
+		}
+
+		public bool AllowImplicitDefaultSession {
+			get => allowImplicitDefaultSession;
+			set {
+				if (allowImplicitDefaultSession != value) {
+					allowImplicitDefaultSession = value;
+					OnPropertyChanged(nameof(AllowImplicitDefaultSession));
+				}
+			}
+		}
+
+		public string ImplicitDefaultSessionId {
+			get => implicitDefaultSessionId;
+			set {
+				if (implicitDefaultSessionId != value) {
+					implicitDefaultSessionId = value;
+					OnPropertyChanged(nameof(ImplicitDefaultSessionId));
+				}
+			}
+		}
+
+		public string LogLevel {
+			get => logLevel;
+			set {
+				if (logLevel != value) {
+					logLevel = value;
+					OnPropertyChanged(nameof(LogLevel));
+				}
+			}
+		}
+
+		public bool EnableFileLogging {
+			get => enableFileLogging;
+			set {
+				if (enableFileLogging != value) {
+					enableFileLogging = value;
+					OnPropertyChanged(nameof(EnableFileLogging));
+				}
+			}
+		}
+
+		public bool EnableOutputPaneLogging {
+			get => enableOutputPaneLogging;
+			set {
+				if (enableOutputPaneLogging != value) {
+					enableOutputPaneLogging = value;
+					OnPropertyChanged(nameof(EnableOutputPaneLogging));
+				}
+			}
+		}
+
+		public bool EnableToolCallLogging {
+			get => enableToolCallLogging;
+			set {
+				if (enableToolCallLogging != value) {
+					enableToolCallLogging = value;
+					OnPropertyChanged(nameof(EnableToolCallLogging));
+				}
+			}
+		}
+
+		public string De4dotExePath {
+			get => de4dotExePath;
+			set {
+				if (de4dotExePath != value) {
+					de4dotExePath = value;
+					OnPropertyChanged(nameof(De4dotExePath));
+				}
+			}
+		}
+
+		public string De4dotSearchPathsText {
+			get => de4dotSearchPathsText;
+			set {
+				if (de4dotSearchPathsText != value) {
+					de4dotSearchPathsText = value;
+					OnPropertyChanged(nameof(De4dotSearchPathsText));
+				}
+			}
+		}
+
+		public int De4dotMaxSearchDepth {
+			get => de4dotMaxSearchDepth;
+			set {
+				if (de4dotMaxSearchDepth != value) {
+					de4dotMaxSearchDepth = value;
+					OnPropertyChanged(nameof(De4dotMaxSearchDepth));
+				}
+			}
+		}
+
+		public void Apply() {
+			CopyEditorStateToSharedViewModel();
+			sharedViewModel.SaveConfiguration();
+			LoadFrom(McpConfig.Instance);
+		}
+
+		public void ToggleServer() {
+			CopyEditorStateToSharedViewModel();
+			sharedViewModel.ToggleServer();
+			LoadFrom(McpConfig.Instance);
+		}
+
+		public void StartServer() {
+			CopyEditorStateToSharedViewModel();
+			sharedViewModel.StartServer();
+			LoadFrom(McpConfig.Instance);
+		}
+
+		public void StopServer() {
+			CopyEditorStateToSharedViewModel();
+			sharedViewModel.StopServer();
+			LoadFrom(McpConfig.Instance);
+		}
+
+		public void RestartServer() {
+			CopyEditorStateToSharedViewModel();
+			sharedViewModel.RestartServer();
+			LoadFrom(McpConfig.Instance);
+		}
+
+		public void SaveConfiguration() => Apply();
+
+		public void ReloadConfiguration() {
+			sharedViewModel.ReloadConfiguration();
+			LoadFrom(McpConfig.Instance);
+		}
+
+		public void OpenConfigFile() => sharedViewModel.OpenConfigFile();
+		public void OpenLogFile() => sharedViewModel.OpenLogFile();
+		public void OpenLogDirectory() => sharedViewModel.OpenLogDirectory();
+
 		public void ClearLogs() {
-			globalSettings.ClearLogs();
+			sharedViewModel.ClearLogs();
+			OnPropertyChanged(nameof(LogText));
 		}
 
+		public void Dispose() => sharedViewModel.PropertyChanged -= SharedViewModel_PropertyChanged;
+
+		void LoadFrom(McpConfig cfg) {
+			EnableServer = cfg.EnableServer;
+			Host = cfg.Host;
+			Port = cfg.Port;
+			RequireApiKey = cfg.RequireApiKey;
+			ApiKey = cfg.ApiKey;
+			EnableRunScript = cfg.EnableRunScript;
+			ExposeFullToolCatalog = cfg.ExposeFullToolCatalog;
+			AllowImplicitDefaultSession = cfg.AllowImplicitDefaultSession;
+			ImplicitDefaultSessionId = cfg.ImplicitDefaultSessionId;
+			LogLevel = cfg.LogLevel;
+			EnableFileLogging = cfg.EnableFileLogging;
+			EnableOutputPaneLogging = cfg.EnableOutputPaneLogging;
+			EnableToolCallLogging = cfg.EnableToolCallLogging;
+			De4dotExePath = cfg.De4dotExePath;
+			De4dotSearchPathsText = string.Join(Environment.NewLine, cfg.De4dotSearchPaths ?? Enumerable.Empty<string>());
+			De4dotMaxSearchDepth = cfg.De4dotMaxSearchDepth;
+		}
+
+		void CopyEditorStateToSharedViewModel() {
+			sharedViewModel.EnableServer = EnableServer;
+			sharedViewModel.Host = Host;
+			sharedViewModel.Port = Port;
+			sharedViewModel.RequireApiKey = RequireApiKey;
+			sharedViewModel.ApiKey = ApiKey;
+			sharedViewModel.EnableRunScript = EnableRunScript;
+			sharedViewModel.ExposeFullToolCatalog = ExposeFullToolCatalog;
+			sharedViewModel.AllowImplicitDefaultSession = AllowImplicitDefaultSession;
+			sharedViewModel.ImplicitDefaultSessionId = ImplicitDefaultSessionId;
+			sharedViewModel.LogLevel = LogLevel;
+			sharedViewModel.EnableFileLogging = EnableFileLogging;
+			sharedViewModel.EnableOutputPaneLogging = EnableOutputPaneLogging;
+			sharedViewModel.EnableToolCallLogging = EnableToolCallLogging;
+			sharedViewModel.De4dotExePath = De4dotExePath;
+			sharedViewModel.De4dotSearchPathsText = De4dotSearchPathsText;
+			sharedViewModel.De4dotMaxSearchDepth = De4dotMaxSearchDepth;
+		}
+
+		void SharedViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e) {
+			if (e.PropertyName == nameof(McpToolWindowViewModel.StatusMessage))
+				OnPropertyChanged(nameof(StatusMessage));
+			else if (e.PropertyName == nameof(McpToolWindowViewModel.IsServerRunning))
+				OnPropertyChanged(nameof(IsServerRunning));
+			else if (e.PropertyName == nameof(McpToolWindowViewModel.PrimaryServerActionLabel))
+				OnPropertyChanged(nameof(PrimaryServerActionLabel));
+			else if (e.PropertyName == nameof(McpToolWindowViewModel.LogText))
+				OnPropertyChanged(nameof(LogText));
+		}
 	}
 }

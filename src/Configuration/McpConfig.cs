@@ -39,6 +39,13 @@ namespace dnSpy.MCP.Server.Configuration
         // ── Properties ───────────────────────────────────────────────────────
 
         /// <summary>
+        /// If true, the MCP server should start automatically and stay enabled.
+        /// This is the primary on/off switch exposed by the dedicated MCP UI.
+        /// </summary>
+        [JsonPropertyName("enableServer")]
+        public bool EnableServer { get; set; } = true;
+
+        /// <summary>
         /// Absolute path to de4dot.exe.  Leave empty to use auto-discovery.
         /// Example: "C:/tools/de4dot/de4dot.exe"
         /// </summary>
@@ -80,6 +87,52 @@ namespace dnSpy.MCP.Server.Configuration
         /// </summary>
         [JsonPropertyName("enableRunScript")]
         public bool EnableRunScript { get; set; } = false;
+
+        /// <summary>
+        /// If true, MCP tools/list exposes the full tool catalog for compatibility with older clients.
+        /// If false (default), tools/list exposes only the bootstrap discovery/code-mode surface.
+        /// </summary>
+        [JsonPropertyName("exposeFullToolCatalog")]
+        public bool ExposeFullToolCatalog { get; set; } = false;
+
+        /// <summary>
+        /// If true (default), stateless HTTP clients that do not have an SSE session can still
+        /// enable tool groups and build up a working discovery context through a shared implicit session.
+        /// This makes staged discovery work with clients such as Codex that primarily use direct tools/call.
+        /// </summary>
+        [JsonPropertyName("allowImplicitDefaultSession")]
+        public bool AllowImplicitDefaultSession { get; set; } = true;
+
+        /// <summary>
+        /// Session id used when allowImplicitDefaultSession is true and no explicit session id is supplied.
+        /// </summary>
+        [JsonPropertyName("implicitDefaultSessionId")]
+        public string ImplicitDefaultSessionId { get; set; } = "__implicit_http_session__";
+
+        /// <summary>
+        /// Minimum log level written by the centralized logger. One of: Debug, Info, Warning, Error.
+        /// Default Info.
+        /// </summary>
+        [JsonPropertyName("logLevel")]
+        public string LogLevel { get; set; } = "Info";
+
+        /// <summary>
+        /// If true, write MCP logs to the dnspy_mcp.log file. Default true.
+        /// </summary>
+        [JsonPropertyName("enableFileLogging")]
+        public bool EnableFileLogging { get; set; } = true;
+
+        /// <summary>
+        /// If true, write MCP logs to the dnSpy output pane. Default true.
+        /// </summary>
+        [JsonPropertyName("enableOutputPaneLogging")]
+        public bool EnableOutputPaneLogging { get; set; } = true;
+
+        /// <summary>
+        /// If true, emit structured per-tool execution telemetry. Default true.
+        /// </summary>
+        [JsonPropertyName("enableToolCallLogging")]
+        public bool EnableToolCallLogging { get; set; } = true;
 
         /// <summary>
         /// Maximum directory levels to search upward for a sibling de4dot repository when
@@ -162,6 +215,14 @@ namespace dnSpy.MCP.Server.Configuration
         {
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(path, json);
+        }
+
+        /// <summary>
+        /// Persists the current in-memory configuration to the standard config file path.
+        /// </summary>
+        public void Save()
+        {
+            Save(ConfigFilePath);
         }
 
         // ── de4dot resolution ─────────────────────────────────────────────────

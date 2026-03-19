@@ -1,7 +1,7 @@
 /*
     Copyright (C) 2026 @chichicaste
 
-    This file is part of dnSpy MCP Server module. 
+    This file is part of dnSpy MCP Server module.
 
     dnSpy MCP Server is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,22 +17,29 @@
     along with dnSpy MCP Server.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
-using System.Linq;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using dnSpy.Contracts.Output;
-using dnSpy.Contracts.Text;
 
 namespace dnSpy.MCP.Server.Presentation {
 	/// <summary>
-	/// User control for MCP server settings UI.
+	/// Shared MCP settings UI used by the options page.
 	/// </summary>
 	public partial class McpSettingsControl : UserControl {
 		/// <summary>
-		/// Initializes the settings control.
+		/// Initializes the control.
 		/// </summary>
 		public McpSettingsControl() => InitializeComponent();
+
+		IMcpSettingsActionHandler? ViewModel => DataContext as IMcpSettingsActionHandler;
+
+		void PrimaryServerActionButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.ToggleServer();
+		void SaveButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.SaveConfiguration();
+		void ReloadButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.ReloadConfiguration();
+		void OpenConfigButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.OpenConfigFile();
+		void OpenLogFileButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.OpenLogFile();
+		void OpenLogFolderButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.OpenLogDirectory();
+		void ClearLogsButton_OnClick(object sender, RoutedEventArgs e) => ViewModel?.ClearLogs();
+
+		void LogTextBox_OnTextChanged(object sender, TextChangedEventArgs e) => LogTextBox.ScrollToEnd();
 	}
 }

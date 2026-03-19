@@ -2,7 +2,7 @@
     Copyright (C) 2026 @chichicaste
     Modifications Copyright (C) 2026 @geocine
 
-    This file is part of dnSpy MCP Server module. 
+    This file is part of dnSpy MCP Server module.
 
     dnSpy MCP Server is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,6 +40,8 @@ namespace dnSpy.MCP.Server.Helper {
 	/// </summary>
 	public static class McpLogger {
 		static readonly object locker = new object();
+		static readonly List<string> recentMessages = new List<string>();
+		const int MaxRecentMessages = 1000;
 
 		// These are set by the auto-loaded MEF class.
 		internal static IOutputTextPane? OutputPane { get; set; }
@@ -48,6 +50,7 @@ namespace dnSpy.MCP.Server.Helper {
 		// Buffer messages produced before the output pane is created.
 		static readonly List<string> pendingMessages = new List<string>();
 		const int MaxBufferedMessages = 1000;
+		public static event EventHandler<string>? MessageLogged;
 
 		/// <summary>
 		/// Gets the log directory path.
@@ -71,10 +74,10 @@ namespace dnSpy.MCP.Server.Helper {
 		/// Log levels for categorizing messages.
 		/// </summary>
 		public enum LogLevel {
+			Debug,
 			Info,
 			Warning,
-			Error,
-			Debug
+			Error
 		}
 
 		/// <summary>
@@ -82,15 +85,23 @@ namespace dnSpy.MCP.Server.Helper {
 		/// Message is written to both file and output pane.
 		/// </summary>
 		public static void Log(LogLevel level, string message) {
+			if (!ShouldLog(level))
+				return;
+
 			var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
 			var levelStr = level.ToString().ToUpper();
 			var formattedMessage = $"[{timestamp}] [{levelStr}] {message}";
 
+			var config = dnSpy.MCP.Server.Configuration.McpConfig.Instance;
+			PublishToUiListeners(formattedMessage);
+
 			// Write to file first (best-effort)
-			WriteToFile(formattedMessage);
+			if (config.EnableFileLogging)
+				WriteToFile(formattedMessage);
 
 			// Write to output pane (buffered if not ready)
-			WriteToOutputPane(formattedMessage);
+			if (config.EnableOutputPaneLogging)
+				WriteToOutputPane(formattedMessage);
 
 			// For errors, also write to Debug/Trace as fallback
 			if (level == LogLevel.Error) {
@@ -135,6 +146,38 @@ namespace dnSpy.MCP.Server.Helper {
 			Log(LogLevel.Error, message);
 		}
 
+		static bool ShouldLog(LogLevel level) {
+			var minimum = GetConfiguredMinimumLevel();
+			return GetSeverity(level) >= GetSeverity(minimum);
+		}
+
+		static LogLevel GetConfiguredMinimumLevel() {
+			var configured = dnSpy.MCP.Server.Configuration.McpConfig.Instance.LogLevel;
+			if (Enum.TryParse<LogLevel>(configured, true, out var parsed))
+				return parsed;
+			return LogLevel.Info;
+		}
+
+		static int GetSeverity(LogLevel level) => level switch {
+			LogLevel.Debug => 0,
+			LogLevel.Info => 1,
+			LogLevel.Warning => 2,
+			LogLevel.Error => 3,
+			_ => 1
+		};
+
+		public static IReadOnlyList<string> GetRecentMessages() {
+			lock (locker)
+				return recentMessages.ToArray();
+		}
+
+		public static void ClearInMemoryMessages() {
+			lock (locker) {
+				recentMessages.Clear();
+				pendingMessages.Clear();
+			}
+		}
+
 		/// <summary>
 		/// Writes a message to the log file (best-effort).
 		/// Creates directory if it doesn't exist.
@@ -174,6 +217,23 @@ namespace dnSpy.MCP.Server.Helper {
 				// Keep buffer bounded to avoid unbounded memory use
 				if (pendingMessages.Count > MaxBufferedMessages)
 					pendingMessages.RemoveAt(0);
+			}
+		}
+
+		static void PublishToUiListeners(string formattedMessage) {
+			EventHandler<string>? handlers;
+			lock (locker) {
+				recentMessages.Add(formattedMessage);
+				if (recentMessages.Count > MaxRecentMessages)
+					recentMessages.RemoveAt(0);
+				handlers = MessageLogged;
+			}
+
+			try {
+				handlers?.Invoke(null, formattedMessage);
+			}
+			catch {
+				// Ignore listener failures so logging never breaks runtime behavior.
 			}
 		}
 
@@ -271,7 +331,7 @@ namespace dnSpy.MCP.Server.Helper {
 				McpLogger.Info("═══════════════════════════════════════════════════════");
 				McpLogger.Info("MCP Server Output Pane Initialized");
 				McpLogger.Info($"Log file location: {McpLogger.LogFilePath}");
-				McpLogger.Info($"Version: 1.0.0");
+				McpLogger.Info($"Version: {dnSpy.MCP.Server.Contracts.McpBuildInfo.Version}");
 				McpLogger.Info("═══════════════════════════════════════════════════════");
 
 				// Flush any messages that were buffered before the pane existed
@@ -334,7 +394,6 @@ namespace dnSpy.MCP.Server.Helper {
 			LogService<MemoryInspectTools>(serviceLocator);
 			LogService<UsageFindingCommandTools>(serviceLocator);
 			LogService<CodeAnalysisHelpers>(serviceLocator);
-			LogService<SkillsTools>(serviceLocator);
 			LogService<ScriptTools>(serviceLocator);
 			LogService<WindowTools>(serviceLocator);
 			LogService<De4dotTools>(serviceLocator);

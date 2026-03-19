@@ -1,40 +1,175 @@
 <UserControl x:Class="dnSpy.MCP.Server.Presentation.McpSettingsControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Margin="5">
+    <Grid Margin="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Settings Section -->
-        <StackPanel Grid.Row="0">
-            <CheckBox Content="Enable MCP Server" IsChecked="{Binding EnableServer}" Margin="0,0,0,10"/>
-            <TextBlock Text="MCP Server Configuration" FontWeight="Bold" Margin="0,10,0,5"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+        <Border Grid.Row="0" Padding="10" Margin="0,0,0,8" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="4">
+            <DockPanel LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left" Margin="0,0,16,0">
+                    <TextBlock Text="MCP Server" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding StatusMessage}" Margin="0,4,0,0" />
+                </StackPanel>
+                <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                    <Button Content="{Binding PrimaryServerActionLabel}" Width="110" Click="PrimaryServerActionButton_OnClick" />
+                </WrapPanel>
+            </DockPanel>
+        </Border>
 
-                <TextBlock Text="Host:" Grid.Row="0" Grid.Column="0" Margin="0,5,10,5" VerticalAlignment="Center"/>
-                <TextBox Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Grid.Column="1" Margin="0,5,0,5" MinWidth="200"/>
+        <TabControl Grid.Row="1">
+            <TabItem Header="Configuration">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="Paths" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                <TextBlock Text="Port:" Grid.Row="1" Grid.Column="0" Margin="0,5,10,5" VerticalAlignment="Center"/>
-                <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}" Grid.Row="1" Grid.Column="1" Margin="0,5,0,5" MinWidth="200"/>
-            </Grid>
-            <TextBlock Margin="0,10,0,10"
-                       FontStyle="Italic"
-                       Foreground="Gray">
-                <Run Text="Note: Server starts/stops immediately when enabled/disabled."/>
-                <LineBreak/>
-                <Run Text="Host/Port changes require restarting dnSpy."/>
-            </TextBlock>
-        </StackPanel>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Config file" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4,8,4" IsReadOnly="True" Text="{Binding ConfigFilePath, Mode=OneWay}" />
+                            <Button Grid.Row="0" Grid.Column="2" Width="90" Margin="0,4,0,4" Content="Open" Click="OpenConfigButton_OnClick" />
 
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Log file" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,8,4" IsReadOnly="True" Text="{Binding LogFilePath, Mode=OneWay}" />
+                            <Button Grid.Row="1" Grid.Column="2" Width="90" Margin="0,4,0,4" Content="Open" Click="OpenLogFileButton_OnClick" />
+                        </Grid>
+
+                        <TextBlock Text="Server" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable server" />
+                            <CheckBox Grid.Row="0" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableServer}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Host" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,4" Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Port" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4,0,4" Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Require API key" />
+                            <CheckBox Grid.Row="3" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding RequireApiKey}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="API key" />
+                            <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4,0,4" Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable run_script" />
+                            <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableRunScript}" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Expose full tool catalog" />
+                            <CheckBox Grid.Row="6" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding ExposeFullToolCatalog}" />
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Allow implicit default session" />
+                            <CheckBox Grid.Row="7" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding AllowImplicitDefaultSession}" />
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Implicit default session ID" />
+                            <TextBox Grid.Row="8" Grid.Column="1" Margin="0,4,0,4" Text="{Binding ImplicitDefaultSessionId, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Log level" />
+                            <ComboBox Grid.Row="9" Grid.Column="1" Margin="0,4,0,4" Width="140" HorizontalAlignment="Left" ItemsSource="{Binding AvailableLogLevels}" SelectedItem="{Binding LogLevel}" />
+
+                            <TextBlock Grid.Row="10" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable file logging" />
+                            <CheckBox Grid.Row="10" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableFileLogging}" />
+
+                            <TextBlock Grid.Row="11" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable output pane logging" />
+                            <CheckBox Grid.Row="11" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableOutputPaneLogging}" />
+                        </Grid>
+
+                        <TextBlock Text="Tooling" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable tool call logging" />
+                            <CheckBox Grid.Row="0" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableToolCallLogging}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="de4dot.exe path" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,4" Text="{Binding De4dotExePath, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Top" Text="de4dot search paths" />
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="1"
+                                     Margin="0,4,0,4"
+                                     MinHeight="80"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="True"
+                                     TextWrapping="NoWrap"
+                                     VerticalContentAlignment="Top"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     Text="{Binding De4dotSearchPathsText, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="de4dot max search depth" />
+                            <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4,0,4" Text="{Binding De4dotMaxSearchDepth, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <WrapPanel>
+                            <Button Width="110" Margin="0,0,8,0" Content="Save" Click="SaveButton_OnClick" />
+                            <Button Width="110" Content="Reload" Click="ReloadButton_OnClick" />
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Logs">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <WrapPanel Grid.Row="0" Margin="0,0,0,8">
+                        <Button Width="110" Margin="0,0,8,0" Content="Clear" Click="ClearLogsButton_OnClick" />
+                        <Button Width="110" Margin="0,0,8,0" Content="Open Log File" Click="OpenLogFileButton_OnClick" />
+                        <Button Width="130" Content="Open Log Folder" Click="OpenLogFolderButton_OnClick" />
+                    </WrapPanel>
+
+                    <TextBox x:Name="LogTextBox"
+                             Grid.Row="1"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             Text="{Binding LogText, Mode=OneWay}"
+                             TextChanged="LogTextBox_OnTextChanged" />
+                </Grid>
+            </TabItem>
+        </TabControl>
     </Grid>
 </UserControl>
