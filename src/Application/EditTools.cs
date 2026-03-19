@@ -353,6 +353,139 @@ namespace dnSpy.MCP.Server.Application {
 		}
 
 		/// <summary>
+		/// Renames a symbol by stable v2 member_id or legacy symbol reference inputs.
+		/// Supports type, method, field, property, and event metadata names.
+		/// Changes are in-memory until save_assembly is called.
+		/// </summary>
+		public CallToolResult RenameSymbol(Dictionary<string, object>? arguments) {
+			if (arguments == null)
+				throw new ArgumentException("Arguments required");
+			if (!arguments.TryGetValue("new_name", out var newNameObj))
+				throw new ArgumentException("new_name is required");
+
+			var newName = newNameObj.ToString() ?? "";
+			if (string.IsNullOrWhiteSpace(newName))
+				throw new ArgumentException("new_name cannot be empty");
+
+			var resolved = ResolveEditableReference(arguments);
+			string oldName;
+			string symbolKind;
+			string memberId;
+
+			switch (resolved) {
+				case TypeDef type:
+					oldName = type.Name.String;
+					type.Name = newName;
+					symbolKind = "type";
+					memberId = BuildMemberId(type.Module, type.MDToken.Raw, 'T');
+					break;
+
+				case MethodDef method:
+					oldName = method.Name.String;
+					method.Name = newName;
+					symbolKind = "method";
+					memberId = BuildMemberId(method.Module, method.MDToken.Raw, 'M');
+					break;
+
+				case FieldDef field:
+					oldName = field.Name.String;
+					field.Name = newName;
+					symbolKind = "field";
+					memberId = BuildMemberId(field.Module, field.MDToken.Raw, 'F');
+					break;
+
+				case PropertyDef property:
+					oldName = property.Name.String;
+					property.Name = newName;
+					symbolKind = "property";
+					memberId = BuildMemberId(property.Module, property.MDToken.Raw, 'P');
+					break;
+
+				case EventDef @event:
+					oldName = @event.Name.String;
+					@event.Name = newName;
+					symbolKind = "event";
+					memberId = BuildMemberId(@event.Module, @event.MDToken.Raw, 'E');
+					break;
+
+				default:
+					throw new ArgumentException($"Unsupported symbol kind: {resolved.GetType().Name}");
+			}
+
+			var result = JsonSerializer.Serialize(new {
+				SymbolKind = symbolKind,
+				OldName = oldName,
+				NewName = newName,
+				MemberId = memberId,
+				Note = "Metadata name updated in memory. Use save_assembly to persist to disk."
+			}, new JsonSerializerOptions { WriteIndented = true });
+
+			return new CallToolResult {
+				Content = new List<ToolContent> { new ToolContent { Text = result } }
+			};
+		}
+
+		/// <summary>
+		/// Renames a method parameter by stable method member_id or legacy method reference inputs.
+		/// This patches metadata-backed parameter names. It does not rename transient decompiler locals.
+		/// Changes are in-memory until save_assembly is called.
+		/// </summary>
+		public CallToolResult RenameParameter(Dictionary<string, object>? arguments) {
+			if (arguments == null)
+				throw new ArgumentException("Arguments required");
+			if (!arguments.TryGetValue("new_name", out var newNameObj))
+				throw new ArgumentException("new_name is required");
+
+			var newName = newNameObj.ToString() ?? "";
+			if (string.IsNullOrWhiteSpace(newName))
+				throw new ArgumentException("new_name cannot be empty");
+
+			var method = ResolveEditableReference(arguments) as MethodDef
+				?? throw new ArgumentException("rename_parameter requires a method member_id or legacy method reference arguments.");
+
+			var paramDefs = method.ParamDefs
+				.Where(p => p.Sequence > 0)
+				.OrderBy(p => p.Sequence)
+				.ToList();
+
+			if (paramDefs.Count == 0)
+				throw new ArgumentException("This method has no metadata-backed parameter definitions to rename.");
+
+			ParamDef? parameter = null;
+			if (arguments.TryGetValue("parameter_index", out var indexObj)) {
+				var index = ParseIntArg(indexObj, "parameter_index");
+				if (index < 0 || index >= paramDefs.Count)
+					throw new ArgumentException($"parameter_index out of range. Method has {paramDefs.Count} parameter definitions.");
+				parameter = paramDefs[index];
+			}
+			else if (arguments.TryGetValue("old_name", out var oldNameObj)) {
+				var oldName = oldNameObj?.ToString() ?? "";
+				parameter = paramDefs.FirstOrDefault(p => string.Equals(p.Name, oldName, StringComparison.Ordinal));
+				if (parameter == null)
+					throw new ArgumentException($"Parameter '{oldName}' not found. Available: {string.Join(", ", paramDefs.Select(p => p.Name))}");
+			}
+			else {
+				throw new ArgumentException("parameter_index or old_name is required");
+			}
+
+			var previousName = parameter.Name;
+			parameter.Name = newName;
+
+			var result = JsonSerializer.Serialize(new {
+				Method = method.FullName,
+				MethodMemberId = BuildMemberId(method.Module, method.MDToken.Raw, 'M'),
+				ParameterSequence = parameter.Sequence,
+				OldName = previousName,
+				NewName = newName,
+				Note = "Parameter metadata name updated in memory. Use save_assembly to persist to disk. Local variable names are not generally stored in the binary unless debug symbols exist."
+			}, new JsonSerializerOptions { WriteIndented = true });
+
+			return new CallToolResult {
+				Content = new List<ToolContent> { new ToolContent { Text = result } }
+			};
+		}
+
+		/// <summary>
 		/// Saves a modified assembly to disk using dnlib's module writer.
 		/// Arguments: assembly_name, output_path (optional; defaults to original file location)
 		/// </summary>
@@ -1926,6 +2059,111 @@ namespace dnSpy.MCP.Server.Application {
 			if (uint.TryParse(s, out var dec))
 				return dec;
 			return 0;
+		}
+
+		object ResolveEditableReference(Dictionary<string, object> arguments) {
+			if (arguments.TryGetValue("member_id", out var memberIdObj) && !string.IsNullOrWhiteSpace(memberIdObj?.ToString()))
+				return ResolveMemberId(memberIdObj!.ToString()!);
+
+			if (!arguments.TryGetValue("assembly_name", out var asmNameObj))
+				throw new ArgumentException("assembly_name is required unless member_id is provided");
+
+			var filePath = arguments.TryGetValue("file_path", out var filePathObj) ? filePathObj?.ToString() : null;
+			var assembly = FindAssemblyByName(asmNameObj.ToString() ?? "", filePath);
+			if (assembly == null)
+				throw new ArgumentException($"Assembly not found: {asmNameObj}");
+
+			if (!arguments.TryGetValue("type_full_name", out var typeNameObj))
+				throw new ArgumentException("type_full_name is required unless member_id is provided");
+
+			var type = FindTypeInAssemblyAll(assembly, typeNameObj.ToString() ?? "");
+			if (type == null)
+				throw new ArgumentException($"Type not found: {typeNameObj}");
+
+			if (arguments.TryGetValue("method_name", out var methodNameObj) && !string.IsNullOrWhiteSpace(methodNameObj?.ToString())) {
+				var methodName = methodNameObj!.ToString()!;
+				var signature = arguments.TryGetValue("method_signature", out var sigObj) ? sigObj?.ToString() : null;
+				var methods = type.Methods.Where(m => m.Name.String.Equals(methodName, StringComparison.Ordinal)).ToList();
+				if (!string.IsNullOrWhiteSpace(signature))
+					methods = methods.Where(m => string.Equals(m.MethodSig?.ToString(), signature, StringComparison.Ordinal)).ToList();
+				if (methods.Count == 0)
+					throw new ArgumentException($"Method '{methodName}' not found in '{type.FullName}'.");
+				if (methods.Count > 1)
+					throw new ArgumentException($"Method '{methodName}' is ambiguous. Provide method_signature or member_id.");
+				return methods[0];
+			}
+
+			if (arguments.TryGetValue("field_name", out var fieldNameObj) && !string.IsNullOrWhiteSpace(fieldNameObj?.ToString())) {
+				var field = type.Fields.FirstOrDefault(f => f.Name.String.Equals(fieldNameObj!.ToString(), StringComparison.Ordinal));
+				return field ?? throw new ArgumentException($"Field '{fieldNameObj}' not found in '{type.FullName}'.");
+			}
+
+			if (arguments.TryGetValue("property_name", out var propertyNameObj) && !string.IsNullOrWhiteSpace(propertyNameObj?.ToString())) {
+				var property = type.Properties.FirstOrDefault(p => p.Name.String.Equals(propertyNameObj!.ToString(), StringComparison.Ordinal));
+				return property ?? throw new ArgumentException($"Property '{propertyNameObj}' not found in '{type.FullName}'.");
+			}
+
+			if (arguments.TryGetValue("event_name", out var eventNameObj) && !string.IsNullOrWhiteSpace(eventNameObj?.ToString())) {
+				var @event = type.Events.FirstOrDefault(e => e.Name.String.Equals(eventNameObj!.ToString(), StringComparison.Ordinal));
+				return @event ?? throw new ArgumentException($"Event '{eventNameObj}' not found in '{type.FullName}'.");
+			}
+
+			if (arguments.TryGetValue("member_kind", out var memberKindObj) && arguments.TryGetValue("member_name", out var memberNameObj)) {
+				var memberKind = memberKindObj?.ToString()?.ToLowerInvariant() ?? "";
+				var memberName = memberNameObj?.ToString() ?? "";
+				return memberKind switch {
+					"type" => type,
+					"method" => type.Methods.FirstOrDefault(m => m.Name.String.Equals(memberName, StringComparison.Ordinal))
+						?? throw new ArgumentException($"Method '{memberName}' not found in '{type.FullName}'."),
+					"field" => type.Fields.FirstOrDefault(f => f.Name.String.Equals(memberName, StringComparison.Ordinal))
+						?? throw new ArgumentException($"Field '{memberName}' not found in '{type.FullName}'."),
+					"property" => type.Properties.FirstOrDefault(p => p.Name.String.Equals(memberName, StringComparison.Ordinal))
+						?? throw new ArgumentException($"Property '{memberName}' not found in '{type.FullName}'."),
+					"event" => type.Events.FirstOrDefault(e => e.Name.String.Equals(memberName, StringComparison.Ordinal))
+						?? throw new ArgumentException($"Event '{memberName}' not found in '{type.FullName}'."),
+					_ => throw new ArgumentException($"Invalid member_kind: '{memberKind}'. Expected type/method/field/property/event.")
+				};
+			}
+
+			return type;
+		}
+
+		object ResolveMemberId(string memberId) {
+			var parts = memberId.Split(':');
+			if (parts.Length != 3)
+				throw new ArgumentException($"Invalid member_id format: {memberId}");
+			if (!Guid.TryParseExact(parts[0], "N", out var mvid))
+				throw new ArgumentException($"Invalid module MVID in member_id: {memberId}");
+			if (!uint.TryParse(parts[1], System.Globalization.NumberStyles.HexNumber, null, out var rawToken))
+				throw new ArgumentException($"Invalid metadata token in member_id: {memberId}");
+
+			var module = FindLoadedModuleByMvid(mvid)
+				?? throw new ArgumentException($"No loaded module found for MVID {mvid:N}. Load the assembly first.");
+			return module.ResolveToken(rawToken)
+				?? throw new ArgumentException($"Metadata token 0x{rawToken:X8} could not be resolved in module {module.Name}.");
+		}
+
+		ModuleDef? FindLoadedModuleByMvid(Guid mvid) =>
+			UiThreadHelper.Invoke(() =>
+				documentTreeView.GetAllModuleNodes()
+					.Select(m => m.Document?.ModuleDef)
+					.FirstOrDefault(m => m != null && (m.Mvid ?? Guid.Empty) == mvid));
+
+		static string BuildMemberId(ModuleDef module, uint rawToken, char kind) =>
+			$"{(module.Mvid ?? Guid.Empty):N}:{rawToken:X8}:{kind}";
+
+		static int ParseIntArg(object value, string argumentName) {
+			if (value is int i)
+				return i;
+			if (value is JsonElement element) {
+				if (element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var jsonInt))
+					return jsonInt;
+				if (element.ValueKind == JsonValueKind.String && int.TryParse(element.GetString(), out var parsed))
+					return parsed;
+			}
+			if (int.TryParse(value.ToString(), out var result))
+				return result;
+			throw new ArgumentException($"{argumentName} must be an integer");
 		}
 	}
 }
