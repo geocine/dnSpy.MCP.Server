@@ -1,7 +1,7 @@
 /*
     Copyright (C) 2026 @chichicaste
 
-    This file is part of dnSpy MCP Server module. 
+    This file is part of dnSpy MCP Server module.
 
     dnSpy MCP Server is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -106,6 +106,27 @@ namespace dnSpy.MCP.Server.Contracts {
 	}
 
 	/// <summary>
+	/// Hints describing the behavior of an MCP tool.
+	/// </summary>
+	public class ToolAnnotations {
+		[JsonPropertyName("readOnlyHint")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public bool? ReadOnlyHint { get; set; }
+
+		[JsonPropertyName("destructiveHint")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public bool? DestructiveHint { get; set; }
+
+		[JsonPropertyName("idempotentHint")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public bool? IdempotentHint { get; set; }
+
+		[JsonPropertyName("openWorldHint")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public bool? OpenWorldHint { get; set; }
+	}
+
+	/// <summary>
 	/// Describes an MCP tool with its schema.
 	/// </summary>
 	public class ToolInfo {
@@ -126,6 +147,20 @@ namespace dnSpy.MCP.Server.Contracts {
 		/// </summary>
 		[JsonPropertyName("inputSchema")]
 		public Dictionary<string, object> InputSchema { get; set; } = new Dictionary<string, object>();
+
+		/// <summary>
+		/// Optional tool behavior hints for MCP clients.
+		/// </summary>
+		[JsonPropertyName("annotations")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public ToolAnnotations? Annotations { get; set; }
+
+		/// <summary>
+		/// Optional JSON Schema describing structured output.
+		/// </summary>
+		[JsonPropertyName("outputSchema")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public Dictionary<string, object>? OutputSchema { get; set; }
 	}
 
 	/// <summary>
@@ -171,6 +206,13 @@ namespace dnSpy.MCP.Server.Contracts {
 		/// </summary>
 		[JsonPropertyName("isError")]
 		public bool IsError { get; set; }
+
+		/// <summary>
+		/// Optional machine-readable representation of the result.
+		/// </summary>
+		[JsonPropertyName("structuredContent")]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public object? StructuredContent { get; set; }
 	}
 
 	/// <summary>
@@ -238,13 +280,13 @@ namespace dnSpy.MCP.Server.Contracts {
 		/// Server name.
 		/// </summary>
 		[JsonPropertyName("name")]
-		public string Name { get; set; } = "dnSpy MCP Server";
+		public string Name { get; set; } = McpBuildInfo.ServerName;
 
 		/// <summary>
 		/// Server version.
 		/// </summary>
 		[JsonPropertyName("version")]
-		public string Version { get; set; } = "1.0.0";
+		public string Version { get; set; } = McpBuildInfo.Version;
 	}
 
 	/// <summary>

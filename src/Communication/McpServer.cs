@@ -368,7 +368,7 @@ namespace dnSpy.MCP.Server.Communication {
 				return;
 			}
 
-			var response = HandleRequest(request);
+			var response = HandleRequest(request, GetSessionIdFromRequest(context.Request));
 			WriteJsonResponse(context.Response, response);
 		}
 
@@ -567,7 +567,7 @@ namespace dnSpy.MCP.Server.Communication {
 					McpLogger.Warning("POST /message: invalid JSON-RPC body");
 					return;
 				}
-				var response = HandleRequest(request);
+				var response = HandleRequest(request, sessionId);
 				var json = JsonSerializer.Serialize(response, jsonOptions);
 				capturedClient.SendMessage(json);
 			}
@@ -717,7 +717,7 @@ namespace dnSpy.MCP.Server.Communication {
 			}
 		}
 
-		McpResponse HandleRequest(McpRequest request) {
+		McpResponse HandleRequest(McpRequest request, string? sessionId = null) {
 			try {
 				// Handle notifications (no response needed)
 				if (request.Method.StartsWith("notifications/")) {
@@ -734,9 +734,10 @@ namespace dnSpy.MCP.Server.Communication {
 				var result = request.Method switch {
 					"initialize" => HandleInitialize(request.Params),
 					"ping" => HandlePing(),
-					"tools/list" => HandleListTools(),
-					"tools/call" => HandleCallTool(request.Params),
+					"tools/list" => HandleListTools(sessionId),
+					"tools/call" => HandleCallTool(request.Params, sessionId),
 					"resources/list" => HandleListResources(),
+					"resources/templates/list" => HandleListResourceTemplates(),
 					"resources/read" => HandleReadResource(request.Params),
 					_ => throw new Exception($"Unknown method: {request.Method}")
 				};
@@ -794,8 +795,8 @@ namespace dnSpy.MCP.Server.Communication {
 					Resources = new Dictionary<string, object>()
 				},
 				ServerInfo = new ServerInfo {
-					Name = "dnSpy MCP Server",
-					Version = "1.0.0"
+					Name = McpBuildInfo.ServerName,
+					Version = McpBuildInfo.Version
 				}
 			};
 		}
@@ -837,14 +838,14 @@ namespace dnSpy.MCP.Server.Communication {
 			return new { };
 		}
 
-		object HandleListTools() {
+		object HandleListTools(string? sessionId) {
 			var tools = ResolveTools();
 			return new ListToolsResult {
-				Tools = tools.GetAvailableTools()
+				Tools = tools.GetAvailableTools(sessionId)
 			};
 		}
 
-		object HandleCallTool(Dictionary<string, object>? parameters) {
+		object HandleCallTool(Dictionary<string, object>? parameters, string? sessionId) {
 			if (parameters == null)
 				throw new ArgumentException("Parameters required");
 
@@ -866,7 +867,44 @@ namespace dnSpy.MCP.Server.Communication {
 				toolArgs = JsonSerializer.Deserialize<Dictionary<string, object>>(argsElem.GetRawText());
 
 			var tools = ResolveTools();
-			return tools.ExecuteTool(toolName, toolArgs);
+			var result = tools.ExecuteTool(toolName, toolArgs, sessionId);
+			if (!result.IsError &&
+			    (string.Equals(toolName, "dnspy_enable_tool_groups", StringComparison.Ordinal) ||
+			     string.Equals(toolName, "dnspy_disable_tool_groups", StringComparison.Ordinal))) {
+				var effectiveSessionId = tools.ResolveEffectiveSessionId(sessionId, toolArgs);
+				if (!string.IsNullOrWhiteSpace(effectiveSessionId))
+					SendToolsListChangedNotification(effectiveSessionId!);
+			}
+			return result;
+		}
+
+		string? GetSessionIdFromRequest(HttpListenerRequest request) {
+			var querySessionId = request.QueryString["sessionId"];
+			if (!string.IsNullOrWhiteSpace(querySessionId))
+				return querySessionId;
+
+			var headerSessionId = request.Headers["X-MCP-Session-Id"];
+			if (!string.IsNullOrWhiteSpace(headerSessionId))
+				return headerSessionId;
+
+			return null;
+		}
+
+		void SendToolsListChangedNotification(string sessionId) {
+			SseClient? client;
+			lock (sseClientsLock) {
+				sessionClients.TryGetValue(sessionId, out client);
+			}
+
+			if (client == null || client.IsClosed)
+				return;
+
+			var payload = JsonSerializer.Serialize(new {
+				jsonrpc = "2.0",
+				method = "notifications/tools/list_changed",
+				@params = new { }
+			}, jsonOptions);
+			client.SendMessage(payload);
 		}
 
 		McpTools ResolveTools() {
@@ -885,6 +923,12 @@ namespace dnSpy.MCP.Server.Communication {
 		object HandleListResources() {
 			return new ListResourcesResult {
 				Resources = bepinexResources.GetResources()
+			};
+		}
+
+		object HandleListResourceTemplates() {
+			return new {
+				resourceTemplates = new List<object>()
 			};
 		}
 

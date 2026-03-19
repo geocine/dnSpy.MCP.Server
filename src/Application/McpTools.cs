@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -31,6 +32,7 @@ using dnSpy.Contracts.Scripting;
 using dnSpy.Contracts.Documents.Tabs.DocViewer;
 using dnSpy.Contracts.Documents.TreeView;
 using dnSpy.Contracts.Text;
+using dnSpy.MCP.Server.Communication;
 using dnSpy.MCP.Server.Contracts;
 using dnSpy.MCP.Server.Application;
 using dnSpy.MCP.Server.Helper;
@@ -52,7 +54,6 @@ namespace dnSpy.MCP.Server.Application
         readonly Lazy<CodeAnalysisHelpers> codeAnalysisTools;
         readonly Lazy<De4dotExeTool> de4dotExeTool;
         readonly Lazy<De4dotTools> de4dotTools;
-        readonly Lazy<SkillsTools> skillsTools;
         readonly Lazy<ScriptTools> scriptTools;
         readonly Lazy<WindowTools> windowTools;
 
@@ -71,7 +72,6 @@ namespace dnSpy.MCP.Server.Application
             this.codeAnalysisTools = CreateLazy<CodeAnalysisHelpers>();
             this.de4dotExeTool = CreateLazy<De4dotExeTool>();
             this.de4dotTools = CreateLazy<De4dotTools>();
-            this.skillsTools = CreateLazy<SkillsTools>();
             this.scriptTools = CreateLazy<ScriptTools>();
             this.windowTools = CreateLazy<WindowTools>();
         }
@@ -91,10 +91,29 @@ namespace dnSpy.MCP.Server.Application
 
         internal bool CanResolve<T>() where T : class => serviceLocator.TryResolve<T>() != null;
 
+        internal ToolCatalog GetToolCatalog() =>
+            ToolCatalog.Create(BuildLegacyToolList());
+
         internal bool IsToolCallable(string toolName) => toolName switch {
             "list_assemblies" or "select_assembly" or "close_assembly" or "close_all_assemblies" or
-            "get_assembly_info" or "list_types" or "list_native_modules" or "scan_pe_strings" or
-            "load_assembly" => CanResolve<AssemblyTools>(),
+            "get_assembly_info" or "get_pe_info" or "normalize_member_id" or "resolve_member_id" or
+            "get_member_details" or "get_decompiled_source" or "batch_get_decompiled_source" or "get_ast_outline" or
+            "decompile_assembly" or "get_startup_map" or "get_resource_map" or
+            "get_reconstruction_diagnostics" or "get_manifest_and_entrypoints" or "get_native_module_map" or "search_members" or "search_string_literals" or
+            "get_user_strings" or "find_string_references" or "find_callees" or "get_method_xrefs" or
+            "find_base_types" or "find_derived_types" or "get_implementations" or "get_overrides" or
+            "find_usages" or "search_attributes" or "list_types" or "list_native_modules" or
+            "get_native_imports" or "get_native_exports" or
+            "scan_pe_strings" or "load_assembly" or "resolve_token" or "validate_assembly" or
+            "list_metadata_tables" or "dump_metadata_heap" or "analyze_static_constructors" or
+            "find_reflection_usage" or "suggest_symbol_renames" or "detect_anti_debug" or
+            "detect_anti_tamper" or "find_proxy_methods" or "detect_string_encryption" or
+            "find_delegate_creation" or "find_dynamic_code" or "find_byte_arrays" or
+            "find_embedded_pes" or "analyze_control_flow" or "get_protection_report" or
+            "triage" or "get_semantic_labels" or "get_cfg" or "match_framework_or_package" or
+            "label_third_party_components" or "identify_known_binary" or "get_provenance_report" or
+            "load_symbols" or "get_symbol_status" or "find_source_candidates" or
+            "match_open_source_candidates" => CanResolve<AssemblyTools>(),
 
             "get_type_info" or "decompile_method" or "list_methods_in_type" or "search_methods" or "list_properties_in_type" or
             "get_method_signature" or "get_method_il" or "get_method_il_bytes" or
@@ -102,7 +121,7 @@ namespace dnSpy.MCP.Server.Application
             "find_path_to_type" => CanResolve<TypeTools>(),
 
             "decompile_type" or "change_member_visibility" or "rename_member" or "rename_method" or "save_assembly" or
-            "get_assembly_metadata" or "edit_assembly_metadata" or "list_assembly_attributes" or
+            "rename_symbol" or "rename_parameter" or "get_assembly_metadata" or "edit_assembly_metadata" or "list_assembly_attributes" or
             "remove_assembly_attribute" or "set_assembly_flags" or "list_assembly_references" or
             "add_assembly_reference" or "remove_assembly_reference" or "list_resources" or
             "get_resource" or "add_resource" or "remove_resource" or "extract_costura" or
@@ -123,9 +142,11 @@ namespace dnSpy.MCP.Server.Application
             "find_dead_code" => CanResolve<CodeAnalysisHelpers>(),
 
             "start_debugging" or "attach_to_process" or "get_debugger_state" or "list_breakpoints" or
-            "set_breakpoint" or "remove_breakpoint" or "clear_all_breakpoints" or "continue_debugger" or
+            "set_breakpoint" or "set_tracepoint" or "remove_breakpoint" or "clear_all_breakpoints" or "continue_debugger" or
             "break_debugger" or "stop_debugging" or "get_call_stack" or "step_over" or
             "step_into" or "step_out" or "get_current_location" or "wait_for_pause" or
+            "inspect_breakpoint" or "get_selected_node" or "get_active_tab" or "select_document_node" or
+            "follow_reference" or
             "set_exception_breakpoint" or "remove_exception_breakpoint" or
             "list_exception_breakpoints" => CanResolve<DebugTools>(),
 
@@ -133,32 +154,134 @@ namespace dnSpy.MCP.Server.Application
             "list_deobfuscators" or "detect_obfuscator" or "deobfuscate_assembly" or
             "save_deobfuscated" => CanResolve<De4dotTools>(),
 
-            "list_skills" or "get_skill" or "save_skill" or "search_skills" or
-            "delete_skill" => CanResolve<SkillsTools>(),
-
             "run_script" => CanResolve<ScriptTools>(),
             "list_dialogs" or "close_dialog" => CanResolve<WindowTools>(),
 
             "search_types" or "find_who_calls_method" or "analyze_type_inheritance" or
-            "list_tools" or "get_mcp_config" or "reload_mcp_config" => true,
+            "list_tools" or "status" or "get_server_stats" or "get_logging_status" or "set_logging" or "search_tools" or
+            "get_tool_schemas" or "list_tool_groups" or "enable_tool_groups" or
+            "disable_tool_groups" or "get_enabled_tool_groups" => true,
+
+            "get_code_mode_guide" or "get_code_examples" or "validate_code_snippet" or "execute_code" => CanResolve<ScriptTools>(),
 
             _ => true
         };
 
-        public CallToolResult ExecuteTool(string toolName, Dictionary<string, object>? arguments)
+        public CallToolResult ExecuteTool(string toolName, Dictionary<string, object>? arguments, string? sessionId = null, bool bypassVisibilityForCodeMode = false)
         {
-            McpLogger.Info($"Executing tool: {toolName}");
+            if (!ToolNameMapper.TryMapPublicToInternal(toolName, out var internalToolName))
+            {
+                return ToolResponseFactory.Text($"Unknown tool: {toolName}", true, new {
+                    tool_name = toolName,
+                    error = "unknown_tool"
+                });
+            }
 
             try
             {
-                var result = toolName switch
+                var effectiveSessionId = ResolveEffectiveSessionId(sessionId, arguments);
+                var stopwatch = Stopwatch.StartNew();
+                var shouldLogToolCall = Configuration.McpConfig.Instance.EnableToolCallLogging;
+                if (shouldLogToolCall)
+                    McpLogger.Info($"Tool start public={toolName} internal={internalToolName} session={DescribeSessionMode(effectiveSessionId)} args={SummarizeToolArguments(internalToolName, arguments)}");
+
+                if (!bypassVisibilityForCodeMode && !IsToolVisible(internalToolName, effectiveSessionId))
                 {
-                    "list_tools" => ListTools(),
+                    var hiddenResult = CreateHiddenToolError(toolName);
+                    if (shouldLogToolCall)
+                        McpLogger.Warning($"Tool hidden public={toolName} internal={internalToolName} session={DescribeSessionMode(effectiveSessionId)}");
+                    return hiddenResult;
+                }
+
+                if (bypassVisibilityForCodeMode && (internalToolName == "execute_code" || internalToolName == "run_script"))
+                    return ToolResponseFactory.Json(new {
+                        error = "tool_not_allowed_in_code_mode",
+                        tool_name = toolName,
+                        message = $"{toolName} cannot be invoked from dnspy_execute_code."
+                    }, true);
+
+                var result = internalToolName switch
+                {
+                    "list_tools" => ListTools(effectiveSessionId),
+                    "status" => HandleDnspyStatus(),
+                    "get_server_stats" => HandleDnspyGetServerStats(),
+                    "get_logging_status" => HandleDnspyGetLoggingStatus(),
+                    "set_logging" => HandleDnspySetLogging(arguments),
+                    "get_code_mode_guide" => scriptTools.Value.GetCodeModeGuide(arguments),
+                    "get_code_examples" => scriptTools.Value.GetCodeExamples(arguments),
+                    "validate_code_snippet" => scriptTools.Value.ValidateCodeSnippet(arguments),
+                    "search_tools" => HandleSearchTools(arguments, effectiveSessionId),
+                    "get_tool_schemas" => HandleGetToolSchemas(arguments, effectiveSessionId),
+                    "list_tool_groups" => HandleListToolGroups(effectiveSessionId),
+                    "enable_tool_groups" => HandleEnableToolGroups(arguments, effectiveSessionId),
+                    "disable_tool_groups" => HandleDisableToolGroups(arguments, effectiveSessionId),
+                    "get_enabled_tool_groups" => HandleGetEnabledToolGroups(arguments, effectiveSessionId),
+                    "execute_code" => scriptTools.Value.ExecuteCode(arguments, effectiveSessionId, ExecuteTool),
                     "list_assemblies"      => InvokeLazy(assemblyTools, "ListAssemblies",      null),
                     "select_assembly"      => InvokeLazy(assemblyTools, "SelectAssembly",      arguments),
                     "close_assembly"       => InvokeLazy(assemblyTools, "CloseAssembly",       arguments),
                     "close_all_assemblies" => InvokeLazy(assemblyTools, "CloseAllAssemblies",  null),
                     "get_assembly_info"    => InvokeLazy(assemblyTools, "GetAssemblyInfo",     arguments),
+                    "get_pe_info"          => InvokeLazy(assemblyTools, "GetPeInfo",           arguments),
+                    "validate_assembly"    => InvokeLazy(assemblyTools, "ValidateAssembly",    arguments),
+                    "list_metadata_tables" => InvokeLazy(assemblyTools, "ListMetadataTables",  arguments),
+                    "dump_metadata_heap"   => InvokeLazy(assemblyTools, "DumpMetadataHeap",    arguments),
+                    "normalize_member_id"  => InvokeLazy(assemblyTools, "NormalizeMemberId",   arguments),
+                    "resolve_member_id"    => InvokeLazy(assemblyTools, "ResolveMemberId",     arguments),
+                    "get_member_details"   => InvokeLazy(assemblyTools, "GetMemberDetails",    arguments),
+                    "get_decompiled_source" => InvokeLazy(assemblyTools, "GetDecompiledSource", arguments),
+                    "batch_get_decompiled_source" => InvokeLazy(assemblyTools, "BatchGetDecompiledSource", arguments),
+                    "get_ast_outline" => InvokeLazy(assemblyTools, "GetAstOutline", arguments),
+                    "decompile_assembly"   => InvokeLazy(assemblyTools, "DecompileAssembly",   arguments),
+                    "export_to_project"    => InvokeLazy(assemblyTools, "ExportToProject",    arguments),
+                    "get_startup_map"      => InvokeLazy(assemblyTools, "GetStartupMap",       arguments),
+                    "get_resource_map"     => InvokeLazy(assemblyTools, "GetResourceMap",      arguments),
+                    "decompile_baml"       => InvokeLazy(assemblyTools, "DecompileBaml",       arguments),
+                    "export_xaml_resources" => InvokeLazy(assemblyTools, "ExportXamlResources", arguments),
+                    "list_resource_elements" => InvokeLazy(assemblyTools, "ListResourceElements", arguments),
+                    "extract_resx_bundle"   => InvokeLazy(assemblyTools, "ExtractResxBundle", arguments),
+                    "get_reconstruction_diagnostics" => InvokeLazy(assemblyTools, "GetReconstructionDiagnostics", arguments),
+                    "get_manifest_and_entrypoints" => InvokeLazy(assemblyTools, "GetManifestAndEntrypoints", arguments),
+                    "get_native_module_map" => InvokeLazy(assemblyTools, "GetNativeModuleMap", arguments),
+                    "analyze_static_constructors" => InvokeLazy(assemblyTools, "AnalyzeStaticConstructors", arguments),
+                    "search_members"       => InvokeLazy(assemblyTools, "SearchMembers",       arguments),
+                    "search_string_literals" => InvokeLazy(assemblyTools, "SearchStringLiterals", arguments),
+                    "get_user_strings"     => InvokeLazy(assemblyTools, "GetUserStrings",      arguments),
+                    "find_string_references" => InvokeLazy(assemblyTools, "FindStringReferences", arguments),
+                    "find_reflection_usage" => InvokeLazy(assemblyTools, "FindReflectionUsage", arguments),
+                    "suggest_symbol_renames" => InvokeLazy(assemblyTools, "SuggestSymbolRenames", arguments),
+                    "detect_anti_debug" => InvokeLazy(assemblyTools, "DetectAntiDebug", arguments),
+                    "detect_anti_tamper" => InvokeLazy(assemblyTools, "DetectAntiTamper", arguments),
+                    "find_proxy_methods" => InvokeLazy(assemblyTools, "FindProxyMethods", arguments),
+                    "detect_string_encryption" => InvokeLazy(assemblyTools, "DetectStringEncryption", arguments),
+                    "find_delegate_creation" => InvokeLazy(assemblyTools, "FindDelegateCreation", arguments),
+                    "find_dynamic_code" => InvokeLazy(assemblyTools, "FindDynamicCode", arguments),
+                    "find_byte_arrays" => InvokeLazy(assemblyTools, "FindByteArrays", arguments),
+                    "find_embedded_pes" => InvokeLazy(assemblyTools, "FindEmbeddedPes", arguments),
+                    "analyze_control_flow" => InvokeLazy(assemblyTools, "AnalyzeControlFlow", arguments),
+                    "get_cfg" => InvokeLazy(assemblyTools, "GetCfg", arguments),
+                    "get_ssa" => InvokeLazy(assemblyTools, "GetSsa", arguments),
+                    "emulate_method" => InvokeLazy(assemblyTools, "EmulateMethod", arguments),
+                    "get_protection_report" => InvokeLazy(assemblyTools, "GetProtectionReport", arguments),
+                    "triage" => InvokeLazy(assemblyTools, "Triage", arguments),
+                    "get_semantic_labels" => InvokeLazy(assemblyTools, "GetSemanticLabels", arguments),
+                    "match_framework_or_package" => InvokeLazy(assemblyTools, "MatchFrameworkOrPackage", arguments),
+                    "label_third_party_components" => InvokeLazy(assemblyTools, "LabelThirdPartyComponents", arguments),
+                    "identify_known_binary" => InvokeLazy(assemblyTools, "IdentifyKnownBinary", arguments),
+                    "get_provenance_report" => InvokeLazy(assemblyTools, "GetProvenanceReport", arguments),
+                    "load_symbols" => InvokeLazy(assemblyTools, "LoadSymbols", arguments),
+                    "get_symbol_status" => InvokeLazy(assemblyTools, "GetSymbolStatus", arguments),
+                    "find_source_candidates" => InvokeLazy(assemblyTools, "FindSourceCandidates", arguments),
+                    "match_open_source_candidates" => InvokeLazy(assemblyTools, "MatchOpenSourceCandidates", arguments),
+                    "find_callees"         => InvokeLazy(assemblyTools, "FindCallees",         arguments),
+                    "get_method_xrefs"     => InvokeLazy(assemblyTools, "GetMethodXrefs",      arguments),
+                    "find_base_types"      => InvokeLazy(assemblyTools, "FindBaseTypes",       arguments),
+                    "find_derived_types"   => InvokeLazy(assemblyTools, "FindDerivedTypes",    arguments),
+                    "get_implementations"  => InvokeLazy(assemblyTools, "GetImplementations",  arguments),
+                    "get_overrides"        => InvokeLazy(assemblyTools, "GetOverrides",        arguments),
+                    "find_usages"         => InvokeLazy(assemblyTools, "FindUsages",          arguments),
+                    "search_attributes"   => InvokeLazy(assemblyTools, "SearchAttributes",    arguments),
+                    "resolve_token"        => InvokeLazy(assemblyTools, "ResolveToken",        arguments),
                     "list_types" => InvokeLazy(assemblyTools, "ListTypes", arguments),
                     "get_type_info" => InvokeLazy(typeTools, "GetTypeInfo", arguments),
                     "decompile_method" => InvokeLazy(typeTools, "DecompileMethod", arguments),
@@ -178,6 +301,8 @@ namespace dnSpy.MCP.Server.Application
                     "change_member_visibility" => InvokeLazy(editTools, "ChangeVisibility", arguments),
                     "rename_member" => InvokeLazy(editTools, "RenameMember", arguments),
                     "rename_method" => InvokeLazy(editTools, "RenameMethod", arguments),
+                    "rename_symbol" => InvokeLazy(editTools, "RenameSymbol", arguments),
+                    "rename_parameter" => InvokeLazy(editTools, "RenameParameter", arguments),
                     "save_assembly" => InvokeLazy(editTools, "SaveAssembly", arguments),
                     "get_assembly_metadata" => InvokeLazy(editTools, "GetAssemblyMetadata", arguments),
                     "edit_assembly_metadata" => InvokeLazy(editTools, "EditAssemblyMetadata", arguments),
@@ -204,6 +329,8 @@ namespace dnSpy.MCP.Server.Application
                     "get_type_property" => InvokeLazy(typeTools, "GetTypeProperty", arguments),
                     "find_path_to_type" => InvokeLazy(typeTools, "FindPathToType", arguments),
                     "list_native_modules" => InvokeLazy(assemblyTools, "ListNativeModules", arguments),
+                    "get_native_imports" => InvokeLazy(assemblyTools, "GetNativeImports", arguments),
+                    "get_native_exports" => InvokeLazy(assemblyTools, "GetNativeExports", arguments),
 
                     // Memory dump tools
                     "list_runtime_modules" => InvokeLazy(dumpTools, "ListRuntimeModules", arguments),
@@ -245,13 +372,21 @@ namespace dnSpy.MCP.Server.Application
                     // Debug tools
                     "get_debugger_state" => InvokeLazy(debugTools, "GetDebuggerState", arguments),
                     "list_breakpoints" => InvokeLazy(debugTools, "ListBreakpoints", arguments),
+                    "inspect_breakpoint" => InvokeLazy(debugTools, "InspectBreakpoint", arguments),
                     "set_breakpoint" => InvokeLazy(debugTools, "SetBreakpoint", arguments),
+                    "set_tracepoint" => InvokeLazy(debugTools, "SetTracepoint", arguments),
                     "remove_breakpoint" => InvokeLazy(debugTools, "RemoveBreakpoint", arguments),
                     "clear_all_breakpoints" => InvokeLazy(debugTools, "ClearAllBreakpoints", arguments),
                     "continue_debugger" => InvokeLazy(debugTools, "ContinueDebugger", arguments),
                     "break_debugger" => InvokeLazy(debugTools, "BreakDebugger", arguments),
                     "stop_debugging" => InvokeLazy(debugTools, "StopDebugging", arguments),
                     "get_call_stack" => InvokeLazy(debugTools, "GetCallStack", arguments),
+                    "get_selected_node" => InvokeLazy(debugTools, "GetSelectedNode", arguments),
+                    "get_active_tab" => InvokeLazy(debugTools, "GetActiveTab", arguments),
+                    "select_document_node" => InvokeLazy(debugTools, "SelectDocumentNode", arguments),
+                    "follow_reference" => InvokeLazy(debugTools, "FollowReference", arguments),
+                    "get_tool_window_state" => InvokeLazy(debugTools, "GetToolWindowState", arguments),
+                    "focus_debugger_context" => InvokeLazy(debugTools, "FocusDebuggerContext", arguments),
 
                     "step_over"            => InvokeLazy(debugTools, "StepOver",           arguments),
                     "step_into"            => InvokeLazy(debugTools, "StepInto",           arguments),
@@ -265,22 +400,11 @@ namespace dnSpy.MCP.Server.Application
 
                     "run_de4dot"            => InvokeLazy(de4dotExeTool, "RunDe4dot",            arguments),
 
-                    // Config management
-                    "get_mcp_config"    => HandleGetMcpConfig(),
-                    "reload_mcp_config" => HandleReloadMcpConfig(),
-
                     // de4dot deobfuscation tools
                     "list_deobfuscators"    => InvokeLazy(de4dotTools, "ListDeobfuscators",    arguments),
                     "detect_obfuscator"     => InvokeLazy(de4dotTools, "DetectObfuscator",     arguments),
                     "deobfuscate_assembly"  => InvokeLazy(de4dotTools, "DeobfuscateAssembly",  arguments),
                     "save_deobfuscated"     => InvokeLazy(de4dotTools, "SaveDeobfuscated",     arguments),
-
-                    // Skills knowledge base
-                    "list_skills"   => InvokeLazy(skillsTools, "ListSkills",   arguments),
-                    "get_skill"     => InvokeLazy(skillsTools, "GetSkill",     arguments),
-                    "save_skill"    => InvokeLazy(skillsTools, "SaveSkill",    arguments),
-                    "search_skills" => InvokeLazy(skillsTools, "SearchSkills", arguments),
-                    "delete_skill"  => InvokeLazy(skillsTools, "DeleteSkill",  arguments),
 
                     // Roslyn scripting
                     "run_script" => InvokeLazy(scriptTools, "RunScript", arguments),
@@ -298,6 +422,9 @@ namespace dnSpy.MCP.Server.Application
                     }
                 };
 
+                stopwatch.Stop();
+                if (shouldLogToolCall)
+                    McpLogger.Info($"Tool end public={toolName} internal={internalToolName} session={DescribeSessionMode(effectiveSessionId)} elapsed_ms={stopwatch.ElapsedMilliseconds} is_error={result.IsError}");
                 return result;
             }
             catch (Exception ex)
@@ -313,14 +440,23 @@ namespace dnSpy.MCP.Server.Application
             }
         }
 
-        CallToolResult ListTools()
+        CallToolResult ListTools(string? sessionId)
         {
-            var tools = GetAvailableTools();
-            var json = JsonSerializer.Serialize(tools, new JsonSerializerOptions { WriteIndented = true });
-            return new CallToolResult
-            {
-                Content = new List<ToolContent> { new ToolContent { Text = json } }
+            return HandleDnspyListTools(sessionId);
+        }
+
+        CallToolResult HandleDnspyListTools(string? sessionId)
+        {
+            var tools = GetAvailableTools(sessionId);
+            var catalog = GetToolCatalog();
+            var payload = new {
+                tools,
+                total_count = tools.Count,
+                full_catalog_count = catalog.Tools.Count,
+                stats = catalog.GetStats(),
+                enabled_groups = HandleGetEnabledToolGroups(null, sessionId).StructuredContent
             };
+            return ToolResponseFactory.Json(payload);
         }
 
         CallToolResult InvokeLazy<T>(Lazy<T> lazy, string methodName, Dictionary<string, object>? arguments) where T : class
@@ -669,36 +805,153 @@ namespace dnSpy.MCP.Server.Application
             return int.TryParse(v?.ToString(), out var i) ? i : def;
         }
 
-        // ── Config management handlers ────────────────────────────────────────
-
-        CallToolResult HandleGetMcpConfig()
+        static bool OptionalBool(Dictionary<string, object>? args, string key, bool def = false)
         {
-            var cfg = Configuration.McpConfig.Instance;
-            var resolvedDe4dot = cfg.ResolveDe4dotExe();
-            var json = JsonSerializer.Serialize(new {
-                ConfigFilePath     = Configuration.McpConfig.ConfigFilePath,
-                ConfigFileExists   = System.IO.File.Exists(Configuration.McpConfig.ConfigFilePath),
-                De4dotExePath      = cfg.De4dotExePath,
-                De4dotSearchPaths  = cfg.De4dotSearchPaths,
-                ResolvedDe4dotExe  = resolvedDe4dot,
-                De4dotFound        = resolvedDe4dot != null
-            }, new JsonSerializerOptions { WriteIndented = true });
-            return new CallToolResult { Content = new List<ToolContent> { new ToolContent { Text = json } } };
+            if (args == null || !args.TryGetValue(key, out var v) || v == null)
+                return def;
+
+            if (v is JsonElement je)
+            {
+                if (je.ValueKind == JsonValueKind.True)
+                    return true;
+                if (je.ValueKind == JsonValueKind.False)
+                    return false;
+                if (je.ValueKind == JsonValueKind.String && bool.TryParse(je.GetString(), out var parsedFromJson))
+                    return parsedFromJson;
+            }
+
+            return bool.TryParse(v.ToString(), out var parsed) ? parsed : def;
         }
 
-        CallToolResult HandleReloadMcpConfig()
+        CallToolResult HandleDnspyStatus()
         {
-            var cfg = Configuration.McpConfig.Reload();
-            var resolvedDe4dot = cfg.ResolveDe4dotExe();
-            var json = JsonSerializer.Serialize(new {
-                Status             = "reloaded",
-                ConfigFilePath     = Configuration.McpConfig.ConfigFilePath,
-                De4dotExePath      = cfg.De4dotExePath,
-                De4dotSearchPaths  = cfg.De4dotSearchPaths,
-                ResolvedDe4dotExe  = resolvedDe4dot,
-                De4dotFound        = resolvedDe4dot != null
-            }, new JsonSerializerOptions { WriteIndented = true });
-            return new CallToolResult { Content = new List<ToolContent> { new ToolContent { Text = json } } };
+            var server = serviceLocator.TryResolve<McpServer>();
+            var catalog = GetToolCatalog();
+            var config = Configuration.McpConfig.Instance;
+            var visibleTools = GetAvailableTools(null);
+            var payload = new {
+                server_name = McpBuildInfo.ServerName,
+                version = McpBuildInfo.Version,
+                is_running = server?.IsRunning ?? false,
+                status_message = server?.GetStatusMessage() ?? "Server is not available in the current dnSpy composition",
+                registered_tool_count = catalog.Tools.Count,
+                visible_tool_count = visibleTools.Count,
+                discovery_mode = config.ExposeFullToolCatalog ? "full_catalog_compat" : "bootstrap_meta",
+                implicit_default_session_enabled = config.AllowImplicitDefaultSession,
+                implicit_default_session_id = config.AllowImplicitDefaultSession ? config.ImplicitDefaultSessionId : string.Empty,
+                logging = BuildLoggingStatusPayload(),
+                representative_tools = visibleTools.Select(a => a.Name).Take(5).ToList()
+            };
+            return ToolResponseFactory.Json(payload);
+        }
+
+        CallToolResult HandleDnspyGetServerStats()
+        {
+            var config = Configuration.McpConfig.Instance;
+            var payload = new {
+                version = McpBuildInfo.Version,
+                tool_stats = GetToolCatalog().GetStats(),
+                discovery = new {
+                    expose_full_tool_catalog = config.ExposeFullToolCatalog,
+                    allow_implicit_default_session = config.AllowImplicitDefaultSession,
+                    implicit_default_session_id = config.AllowImplicitDefaultSession ? config.ImplicitDefaultSessionId : string.Empty,
+                    enabled_session_count = GetEnabledSessionCount()
+                },
+                logging = BuildLoggingStatusPayload(),
+                service_availability = new Dictionary<string, bool> {
+                    ["assembly_tools"] = CanResolve<AssemblyTools>(),
+                    ["type_tools"] = CanResolve<TypeTools>(),
+                    ["edit_tools"] = CanResolve<EditTools>(),
+                    ["debug_tools"] = CanResolve<DebugTools>(),
+                    ["dump_tools"] = CanResolve<DumpTools>(),
+                    ["memory_inspect_tools"] = CanResolve<MemoryInspectTools>(),
+                    ["usage_finding_tools"] = CanResolve<UsageFindingCommandTools>(),
+                    ["code_analysis_tools"] = CanResolve<CodeAnalysisHelpers>(),
+                    ["de4dot_tools"] = CanResolve<De4dotTools>(),
+                    ["script_tools"] = CanResolve<ScriptTools>(),
+                    ["window_tools"] = CanResolve<WindowTools>()
+                }
+            };
+            return ToolResponseFactory.Json(payload);
+        }
+
+        CallToolResult HandleDnspyGetLoggingStatus()
+        {
+            return ToolResponseFactory.Json(BuildLoggingStatusPayload());
+        }
+
+        CallToolResult HandleDnspySetLogging(Dictionary<string, object>? arguments)
+        {
+            var config = Configuration.McpConfig.Instance;
+            var persist = OptionalBool(arguments, "persist", true);
+            var requestedLogLevel = OptionalString(arguments, "log_level");
+
+            if (!string.IsNullOrWhiteSpace(requestedLogLevel))
+            {
+                if (!Enum.TryParse<McpLogger.LogLevel>(requestedLogLevel, true, out var parsedLevel))
+                    throw new ArgumentException("Invalid log_level. Expected one of: Debug, Info, Warning, Error.");
+                config.LogLevel = parsedLevel.ToString();
+            }
+
+            if (arguments != null && arguments.ContainsKey("enable_file_logging"))
+                config.EnableFileLogging = OptionalBool(arguments, "enable_file_logging", config.EnableFileLogging);
+            if (arguments != null && arguments.ContainsKey("enable_output_pane_logging"))
+                config.EnableOutputPaneLogging = OptionalBool(arguments, "enable_output_pane_logging", config.EnableOutputPaneLogging);
+            if (arguments != null && arguments.ContainsKey("enable_tool_call_logging"))
+                config.EnableToolCallLogging = OptionalBool(arguments, "enable_tool_call_logging", config.EnableToolCallLogging);
+
+            if (persist)
+                config.Save();
+
+            return ToolResponseFactory.Json(new {
+                updated = true,
+                persisted = persist,
+                logging = BuildLoggingStatusPayload()
+            });
+        }
+
+        object BuildLoggingStatusPayload()
+        {
+            var config = Configuration.McpConfig.Instance;
+            return new {
+                log_level = config.LogLevel,
+                enable_file_logging = config.EnableFileLogging,
+                enable_output_pane_logging = config.EnableOutputPaneLogging,
+                enable_tool_call_logging = config.EnableToolCallLogging,
+                log_file_path = config.EnableFileLogging ? McpLogger.LogFilePath : string.Empty
+            };
+        }
+
+        int GetEnabledSessionCount()
+        {
+            lock (enabledToolGroupsLock)
+                return enabledToolGroupsBySession.Count;
+        }
+
+        static string DescribeSessionMode(string? sessionId)
+        {
+            var config = Configuration.McpConfig.Instance;
+            if (string.IsNullOrWhiteSpace(sessionId))
+                return "none";
+            if (config.AllowImplicitDefaultSession &&
+                string.Equals(sessionId, config.ImplicitDefaultSessionId, StringComparison.Ordinal))
+                return "implicit_default";
+            return "explicit";
+        }
+
+        static string SummarizeToolArguments(string internalToolName, Dictionary<string, object>? arguments)
+        {
+            if (arguments == null || arguments.Count == 0)
+                return "none";
+
+            var keys = arguments.Keys.OrderBy(a => a, StringComparer.Ordinal).ToList();
+            if (internalToolName == "execute_code")
+            {
+                var codeLength = OptionalString(arguments, "code")?.Length ?? 0;
+                return $"keys=[{string.Join(",", keys)}],code_length={codeLength}";
+            }
+
+            return $"keys=[{string.Join(",", keys)}]";
         }
     }
 }
