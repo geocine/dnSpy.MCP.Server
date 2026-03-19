@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2026 @chichicaste
+    Copyright (C) 2026 @geocine
 
     This file is part of dnSpy MCP Server module.
 
