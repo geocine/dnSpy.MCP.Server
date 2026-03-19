@@ -5,11 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-- Tool inventory now lives in `docs/tool-reference.md`, and the main `README.md` is kept lean around build, run, and MCP client setup.
-
 ## [2.0.0] - 2026-03-20
 
 ### Added
@@ -18,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added major v2 reconstruction coverage across source recovery, metadata/native inspection, deobfuscation triage, provenance correlation, project export, and dnSpy-host navigation.
 - Added dnSpy-integrated MCP settings and logging UI under `Options -> MCP Server`.
 - Added v2 planning and architecture docs for the reconstruction-first surface.
+- Published the full v2 tool inventory in `docs/tool-reference.md`, covering 180 public `dnspy_*` tools.
+- Kept the main `README.md` lean around build, run, and MCP client setup while linking to the exhaustive tool catalog.
 
 ### Changed
 - Standardized the public MCP surface around `dnspy_*` tool names.
@@ -32,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Moved the exhaustive tool catalog into `docs/tool-reference.md`, including per-tool descriptions and v2 attribution markers for tools that are new or substantially improved in this repository.
+
+### Total tools: **180** (was 98)
 
 ## [1.7.0] - 2026-02-28
 

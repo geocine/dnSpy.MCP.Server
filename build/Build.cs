@@ -78,7 +78,7 @@ class Build : NukeBuild
             RunDotNet($"build \"{SolutionPath}\" -c Release -p:TargetFramework=net10.0-windows --nologo");
         });
 
-    Target McpNet10 => _ => _
+    Target Mcp => _ => _
         .Description("Builds the MCP extension for net10.0-windows.")
         .Executes(() =>
         {
