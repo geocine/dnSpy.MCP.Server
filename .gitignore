@@ -47,3 +47,4 @@ Sample/
 .nuke/temp/
 .nuke/build.schema.json
 libs/
+artifacts/

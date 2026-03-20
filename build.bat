@@ -21,6 +21,8 @@ if "%FIRST_ARG%"=="" (
 if /i "%FIRST_ARG%"=="all" goto :run_all
 if /i "%FIRST_ARG%"=="dnspy" goto :run_dnspy
 if /i "%FIRST_ARG%"=="mcp" goto :run_mcp
+if /i "%FIRST_ARG%"=="holly" goto :run_holly
+if /i "%FIRST_ARG%"=="sync-holly" goto :run_sync_holly
 if /i "%FIRST_ARG%"=="nuke" goto :run_passthrough_after_keyword
 if /i "%FIRST_ARG%"=="help" goto :usage_ok
 if /i "%FIRST_ARG%"=="-h" goto :usage_ok
@@ -45,6 +47,14 @@ goto :invoke
 set "NUKE_ARGS=--target Mcp %REST_ARGS%"
 goto :invoke
 
+:run_holly
+set "NUKE_ARGS=--target Holly %REST_ARGS%"
+goto :invoke
+
+:run_sync_holly
+set "NUKE_ARGS=--target SyncHolly %REST_ARGS%"
+goto :invoke
+
 :run_passthrough
 set "NUKE_ARGS=%*"
 goto :invoke
@@ -65,16 +75,20 @@ dotnet run --project "%BUILD_PROJECT%" -- %NUKE_ARGS%
 exit /b %errorlevel%
 
 :usage_ok
-echo Usage: build.bat [all^|dnspy^|mcp^|nuke ...]
+echo Usage: build.bat [all^|dnspy^|mcp^|holly^|sync-holly^|nuke ...]
 echo.
-echo   all        Repair/build dnSpy, ensure de4dotEx is available, then build the MCP extension for net10.0-windows. Default.
-echo   dnspy      Repair/build only the dnSpy host and ensure de4dotEx is available.
-echo   mcp        Build only the MCP extension for net10.0-windows.
+echo   all        Repair/build dnSpy, then build and install both MCP and HoLLy into the shared dnSpy output. Default.
+echo   dnspy      Repair/build only the shared dnSpy host and ensure submodules are available.
+echo   mcp        Build and install only the MCP extension for net10.0-windows.
+echo   holly      Build and install only the HoLLy extension for net10.0-windows.
+echo   sync-holly Update the HoLLy submodule to the latest origin/master and refresh its nested submodules.
 echo   nuke ...   Pass raw arguments through to the underlying NUKE build.
 echo.
 echo Examples:
 echo   build.bat
 echo   build.bat dnspy
+echo   build.bat holly
+echo   build.bat sync-holly
 echo   build.bat nuke --target Mcp --verbosity verbose
 exit /b 0
 

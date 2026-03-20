@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <Import Project="$(MSBuildThisFileDirectory)dnSpy\DnSpyCommon.props" />
+  <PropertyGroup>
+    <DnSpyRoot Condition="'$(DnSpyRoot)' == ''">$(MSBuildThisFileDirectory)..\..\hosts\dnSpy</DnSpyRoot>
+    <De4dotRoot Condition="'$(De4dotRoot)' == ''">$(MSBuildThisFileDirectory)..\..\vendors\de4dotEx</De4dotRoot>
+    <De4dotOutputDir Condition="'$(De4dotOutputDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\de4dotEx\net8\</De4dotOutputDir>
+  </PropertyGroup>
+
+  <Import Project="$(DnSpyRoot)\DnSpyCommon.props" />
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -12,25 +18,22 @@
     <Description>MCP Server for AI-assisted .NET assembly analysis and BepInEx plugin development</Description>
     <Copyright>Copyright (C) 2026 @chichicaste, @geocine</Copyright>
     <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>dnSpy\dnSpy.snk</AssemblyOriginatorKeyFile>
-    <OutputPath>dnSpy\dnSpy\dnSpy\bin\$(Configuration)\</OutputPath>
+    <AssemblyOriginatorKeyFile>$(DnSpyRoot)\dnSpy.snk</AssemblyOriginatorKeyFile>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultPageItems>false</EnableDefaultPageItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
-    <CopyExtensionToRuntimeOutputs Condition="'$(CopyExtensionToRuntimeOutputs)' == ''">true</CopyExtensionToRuntimeOutputs>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <NoWarn>$(NoWarn);NU1903</NoWarn>
-    <De4dotProjectPath>$(MSBuildThisFileDirectory)de4dotEx\de4dot.cui\de4dot.cui.csproj</De4dotProjectPath>
-    <De4dotOutputDir>$(MSBuildThisFileDirectory)libs\de4dot-net8\</De4dotOutputDir>
+    <De4dotProjectPath>$(De4dotRoot)\de4dot.cui\de4dot.cui.csproj</De4dotProjectPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.DnSpy\dnSpy.Contracts.DnSpy.csproj" />
-    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Logic\dnSpy.Contracts.Logic.csproj" />
-    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger\dnSpy.Contracts.Debugger.csproj" />
-    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger.DotNet\dnSpy.Contracts.Debugger.DotNet.csproj" />
-    <ProjectReference Include="dnSpy\dnSpy\dnSpy.Contracts.Debugger.DotNet.CorDebug\dnSpy.Contracts.Debugger.DotNet.CorDebug.csproj" />
+    <ProjectReference Include="$(DnSpyRoot)\dnSpy\dnSpy.Contracts.DnSpy\dnSpy.Contracts.DnSpy.csproj" Private="false" />
+    <ProjectReference Include="$(DnSpyRoot)\dnSpy\dnSpy.Contracts.Logic\dnSpy.Contracts.Logic.csproj" Private="false" />
+    <ProjectReference Include="$(DnSpyRoot)\dnSpy\dnSpy.Contracts.Debugger\dnSpy.Contracts.Debugger.csproj" Private="false" />
+    <ProjectReference Include="$(DnSpyRoot)\dnSpy\dnSpy.Contracts.Debugger.DotNet\dnSpy.Contracts.Debugger.DotNet.csproj" Private="false" />
+    <ProjectReference Include="$(DnSpyRoot)\dnSpy\dnSpy.Contracts.Debugger.DotNet.CorDebug\dnSpy.Contracts.Debugger.DotNet.CorDebug.csproj" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -85,27 +88,6 @@
     <Error Condition="!Exists('$(De4dotProjectPath)')" Text="de4dotEx submodule is missing. Run 'git submodule update --init --recursive'." />
     <MakeDir Directories="$(De4dotOutputDir)" />
     <Exec Command="dotnet build &quot;$(De4dotProjectPath)&quot; -c Release -f net8.0 --nologo -o &quot;$(De4dotOutputDir)&quot;" />
-  </Target>
-
-  <Target Name="CopyNet10ExtensionToRuntimeSpecificDnSpyOutputs" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net10.0-windows' and '$(CopyExtensionToRuntimeOutputs)' == 'true'">
-    <ItemGroup>
-      <Net10RuntimeDirs Include="$(TargetDir)win-x64\" />
-      <Net10RuntimeDirs Include="$(TargetDir)win-x86\" />
-      <Net10RuntimeFiles Include="$(TargetDir)dnSpy.MCP.Server.x.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)dnSpy.MCP.Server.x.pdb" Condition="Exists('$(TargetDir)dnSpy.MCP.Server.x.pdb')" />
-      <Net10RuntimeFiles Include="$(TargetDir)dnSpy.MCP.Server.x.deps.json" />
-      <Net10RuntimeFiles Include="$(TargetDir)mcp-config.json" />
-      <Net10RuntimeFiles Include="$(TargetDir)AssemblyData.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)de4dot.blocks.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)de4dot.code.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)de4dot.cui.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)de4dot.mdecrypt.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)ModelContextProtocol.Core.dll" />
-      <Net10RuntimeFiles Include="$(TargetDir)ModelContextProtocol.dll" />
-    </ItemGroup>
-
-    <MakeDir Directories="@(Net10RuntimeDirs)" />
-    <Copy SourceFiles="@(Net10RuntimeFiles)" DestinationFolder="%(Net10RuntimeDirs.Identity)" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

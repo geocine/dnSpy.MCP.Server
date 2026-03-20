@@ -10,7 +10,7 @@ An embedded MCP server for dnSpy focused on .NET reconstruction, decompilation, 
 
 - Windows
 - .NET 10 SDK
-- Git submodules enabled for the vendored `dnSpy/` and `de4dotEx/` checkouts
+- Git submodules enabled for the shared `hosts/dnSpy/` host checkout and the vendored dependencies under `vendors/`
 
 ## Getting started
 
@@ -32,8 +32,7 @@ git submodule update --init --recursive
 Use `build.bat`. It is the intended entry point and wraps the NUKE build.
 
 ```bash
-# Default: repair/build dnSpy, build the de4dotEx submodule payload,
-# then build the MCP extension for net10.0-windows
+# Default: repair/build dnSpy, then build and install both extensions
 build.bat
 
 # Build only the dnSpy host
@@ -42,27 +41,36 @@ build.bat dnspy
 # Build only the MCP extension for net10.0-windows
 build.bat mcp
 
+# Build only the HoLLy extension for net10.0-windows
+build.bat holly
+
+# Update the HoLLy submodule to the latest origin/master
+build.bat sync-holly
+
 # Raw NUKE passthrough
 build.bat nuke --target Mcp --verbosity verbose
 ```
 
 Build outputs:
 
-- Extension output root: `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/`
-- `net10.0-windows` runtime copies: `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/win-x64/` and `win-x86/`
-- Main extension assembly: `dnSpy.MCP.Server.x.dll` (the `x` extension loads into dnSpy)
-- Default config deployed next to the extension: `mcp-config.json`
-- Generated de4dot payload: `libs/de4dot-net8/` (build output, git-ignored)
+- Convenience root junction: `bin/` -> `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/` (created locally by the build, not committed)
+- Shared dnSpy host output root: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/`
+- Shared extension install root: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/Extensions/`
+- MCP extension install dir: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/Extensions/dnSpy.MCP.Server/`
+- HoLLy extension install dir: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/Extensions/dnSpy.Extension.HoLLy/`
+- Runtime mirrors: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/win-x64/` and `win-x86/`
+- Generated de4dot payload: `artifacts/de4dotEx/net8/` (build output, git-ignored)
 
 ## Run
 
 Start the dnSpy host you built:
 
-- launch `dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/dnSpy.exe`
+- launch `bin/dnSpy.exe`
+- launch `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/dnSpy.exe`
 
 - The MCP server starts automatically when **Enable server** is on.
 - Host, port, logging, and related settings live in **Options -> MCP Server** and are persisted through `mcp-config.json`.
-- de4dot support is built in from the vendored `de4dotEx/` submodule — there is no external `de4dot.exe` path to configure.
+- de4dot support is built in from the vendored `vendors/de4dotEx/` submodule - there is no external `de4dot.exe` path to configure.
 
 Default HTTP endpoints:
 

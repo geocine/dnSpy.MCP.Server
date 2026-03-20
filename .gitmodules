@@ -1,6 +1,12 @@
 [submodule "dnSpy"]
-	path = dnSpy
+	path = hosts/dnSpy
 	url = https://github.com/dnSpyEx/dnSpy.git
 [submodule "de4dotEx"]
-	path = de4dotEx
+	path = vendors/de4dotEx
 	url = https://github.com/GDATAAdvancedAnalytics/de4dotEx.git
+[submodule "dnSpy.Extension.HoLLy"]
+	path = extensions/dnSpy.Extension.HoLLy
+	url = git@github.com:geocine/dnSpy.Extension.HoLLy.git
+[submodule "vendors/Echo"]
+	path = vendors/Echo
+	url = https://github.com/washi1337/echo
