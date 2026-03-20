@@ -53,13 +53,15 @@ build.bat nuke --target Mcp --verbosity verbose
 
 Build outputs:
 
-- Convenience root junction: `bin/` -> `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/` (created locally by the build, not committed)
-- Shared dnSpy host output root: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/`
-- Shared extension install root: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/Extensions/`
-- MCP extension install dir: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/Extensions/dnSpy.MCP.Server/`
-- HoLLy extension install dir: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/Extensions/dnSpy.Extension.HoLLy/`
-- Runtime mirrors: `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/win-x64/` and `win-x86/`
-- Generated de4dot payload: `artifacts/de4dotEx/net8/` (build output, git-ignored)
+| Output | Path | Notes |
+|---|---|---|
+| Convenience root junction | `bin/` | Points to the host output root; created locally by the build, not committed |
+| dnSpy host output root | `hosts/dnSpy/dnSpy/dnSpy/bin/Release/net10.0-windows/` | |
+| Extension install root | `<dnSpy_host_output_root>/Extensions/` | |
+| MCP extension | `<dnSpy_host_output_root>/Extensions/dnSpy.MCP.Server/` | |
+| HoLLy extension | `<dnSpy_host_output_root>/Extensions/dnSpy.Extension.HoLLy/` | |
+| Runtime mirrors | `<dnSpy_host_output_root>/win-x64/` and `win-x86/` | |
+| de4dot payload | `artifacts/de4dotEx/net8/` | Build output, git-ignored |
 
 ## Run
 
