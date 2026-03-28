@@ -36,6 +36,7 @@ using dnSpy.MCP.Server.Communication;
 using dnSpy.MCP.Server.Contracts;
 using dnSpy.MCP.Server.Application;
 using dnSpy.MCP.Server.Helper;
+using HoLLy.dnSpyExtension.Contracts;
 
 namespace dnSpy.MCP.Server.Application
 {
@@ -47,6 +48,7 @@ namespace dnSpy.MCP.Server.Application
         readonly Lazy<AssemblyTools> assemblyTools;
         readonly Lazy<TypeTools> typeTools;
         readonly Lazy<EditTools> editTools;
+        readonly Lazy<SourceMapTools> sourceMapTools;
         readonly Lazy<DebugTools> debugTools;
         readonly Lazy<DumpTools> dumpTools;
         readonly Lazy<MemoryInspectTools> memoryInspectTools;
@@ -64,6 +66,7 @@ namespace dnSpy.MCP.Server.Application
             this.assemblyTools = CreateLazy<AssemblyTools>();
             this.typeTools = CreateLazy<TypeTools>();
             this.editTools = CreateLazy<EditTools>();
+            this.sourceMapTools = CreateLazy<SourceMapTools>();
             this.debugTools = CreateLazy<DebugTools>();
             this.dumpTools = CreateLazy<DumpTools>();
             this.memoryInspectTools = CreateLazy<MemoryInspectTools>();
@@ -125,6 +128,11 @@ namespace dnSpy.MCP.Server.Application
             "get_resource" or "add_resource" or "remove_resource" or "extract_costura" or
             "inject_type_from_dll" or "list_pinvoke_methods" or "patch_method_to_ret" or
             "list_events_in_type" or "get_custom_attributes" or "list_nested_types" => CanResolve<EditTools>(),
+
+            "sourcemap_status" or "sourcemap_decompile_type" or "sourcemap_decompile_method" or
+            "sourcemap_get_decompiled_source" or "sourcemap_batch_get_decompiled_source" or
+            "sourcemap_rename_member" or "sourcemap_rename_method" or "sourcemap_rename_symbol" or
+            "sourcemap_rename_parameter" or "sourcemap_export" or "sourcemap_import" => CanResolve<SourceMapTools>(),
 
             "list_runtime_modules" or "dump_module_from_memory" or "read_process_memory" or
             "write_process_memory" or "get_pe_sections" or "dump_pe_section" or
@@ -320,6 +328,17 @@ namespace dnSpy.MCP.Server.Application
                     "list_events_in_type" => InvokeLazy(editTools, "ListEventsInType", arguments),
                     "get_custom_attributes" => InvokeLazy(editTools, "GetCustomAttributes", arguments),
                     "list_nested_types" => InvokeLazy(editTools, "ListNestedTypes", arguments),
+                    "sourcemap_status" => InvokeLazy(sourceMapTools, "SourceMapStatus", arguments),
+                    "sourcemap_decompile_type" => InvokeLazy(sourceMapTools, "SourceMapDecompileType", arguments),
+                    "sourcemap_decompile_method" => InvokeLazy(sourceMapTools, "SourceMapDecompileMethod", arguments),
+                    "sourcemap_get_decompiled_source" => InvokeLazy(sourceMapTools, "SourceMapGetDecompiledSource", arguments),
+                    "sourcemap_batch_get_decompiled_source" => InvokeLazy(sourceMapTools, "SourceMapBatchGetDecompiledSource", arguments),
+                    "sourcemap_rename_member" => InvokeLazy(sourceMapTools, "SourceMapRenameMember", arguments),
+                    "sourcemap_rename_method" => InvokeLazy(sourceMapTools, "SourceMapRenameMethod", arguments),
+                    "sourcemap_rename_symbol" => InvokeLazy(sourceMapTools, "SourceMapRenameSymbol", arguments),
+                    "sourcemap_rename_parameter" => InvokeLazy(sourceMapTools, "SourceMapRenameParameter", arguments),
+                    "sourcemap_export" => InvokeLazy(sourceMapTools, "SourceMapExport", arguments),
+                    "sourcemap_import" => InvokeLazy(sourceMapTools, "SourceMapImport", arguments),
 
                     // Previously-hidden TypeTools
                     "get_type_fields" => InvokeLazy(typeTools, "GetTypeFields", arguments),
@@ -857,6 +876,8 @@ namespace dnSpy.MCP.Server.Application
                     ["assembly_tools"] = CanResolve<AssemblyTools>(),
                     ["type_tools"] = CanResolve<TypeTools>(),
                     ["edit_tools"] = CanResolve<EditTools>(),
+                    ["source_map_tools"] = CanResolve<SourceMapTools>(),
+                    ["holly_source_map_service"] = CanResolve<IHoLLySourceMapService>(),
                     ["debug_tools"] = CanResolve<DebugTools>(),
                     ["dump_tools"] = CanResolve<DumpTools>(),
                     ["memory_inspect_tools"] = CanResolve<MemoryInspectTools>(),

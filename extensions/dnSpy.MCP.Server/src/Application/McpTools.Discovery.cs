@@ -48,6 +48,7 @@ namespace dnSpy.MCP.Server.Application {
 			["metadata_and_native"] = "Low-level PE, metadata, heap, CFG, and native import/export inspection.",
 			["deobfuscation_and_recovery"] = "Obfuscation detection, anti-debug and anti-tamper heuristics, semantic relabeling, and protection analysis.",
 			["provenance_and_correlation"] = "Known-binary matching, third-party component labeling, and framework/package/source provenance recovery.",
+			["sourcemap_patchback"] = "HoLLy-backed SourceMap decompilation, display-name mapping, and SourceMap import/export without mutating binary metadata.",
 			["editing_and_patchback"] = "Symbol renaming, metadata editing, resource work, and patchback into the binary for iterative reconstruction.",
 			["debug_runtime"] = "Attach, break, step, inspect frames, locals, and runtime state when static analysis is insufficient.",
 			["memory_and_dumping"] = "Read, write, dump, and unpack process memory and runtime-loaded modules.",

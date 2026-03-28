@@ -1,13 +1,13 @@
 # dnSpy MCP Tool Reference
 
-This reference documents the 180 public `dnspy_*` MCP tools exposed by this repository.
+This reference documents the 191 public `dnspy_*` MCP tools exposed by this repository.
 
 - Descriptions are sourced from `src/Application/McpTools.Schemas.cs` and use the public `dnspy_*` tool names.
 - Original implementation by `@chichicaste`.
 - Attribution per tool uses concise labels: `Upstream`, `Enhanced`, or `New`.
 - `Enhanced` entries include a short note describing what changed here.
 - The lean setup guide stays in `README.md`; this file is the exhaustive tool inventory.
-- Current catalog size: 180 tools across 12 sections.
+- Current catalog size: 191 tools across 12 sections.
 
 ## Sections
 - **[Bootstrap and discovery](#bootstrap-and-discovery)** (15 tools)
@@ -132,7 +132,7 @@ This reference documents the 180 public `dnspy_*` MCP tools exposed by this repo
   - [`dnspy_load_symbols`](#dnspy_load_symbols)
   - [`dnspy_match_framework_or_package`](#dnspy_match_framework_or_package)
   - [`dnspy_match_open_source_candidates`](#dnspy_match_open_source_candidates)
-- **[Editing and patchback](#editing-and-patchback)** (23 tools)
+- **[Editing and patchback](#editing-and-patchback)** (34 tools)
   - [`dnspy_add_assembly_reference`](#dnspy_add_assembly_reference)
   - [`dnspy_add_resource`](#dnspy_add_resource)
   - [`dnspy_change_member_visibility`](#dnspy_change_member_visibility)
@@ -156,6 +156,17 @@ This reference documents the 180 public `dnspy_*` MCP tools exposed by this repo
   - [`dnspy_rename_symbol`](#dnspy_rename_symbol)
   - [`dnspy_save_assembly`](#dnspy_save_assembly)
   - [`dnspy_set_assembly_flags`](#dnspy_set_assembly_flags)
+  - [`dnspy_sourcemap_batch_get_decompiled_source`](#dnspy_sourcemap_batch_get_decompiled_source)
+  - [`dnspy_sourcemap_decompile_method`](#dnspy_sourcemap_decompile_method)
+  - [`dnspy_sourcemap_decompile_type`](#dnspy_sourcemap_decompile_type)
+  - [`dnspy_sourcemap_export`](#dnspy_sourcemap_export)
+  - [`dnspy_sourcemap_get_decompiled_source`](#dnspy_sourcemap_get_decompiled_source)
+  - [`dnspy_sourcemap_import`](#dnspy_sourcemap_import)
+  - [`dnspy_sourcemap_rename_member`](#dnspy_sourcemap_rename_member)
+  - [`dnspy_sourcemap_rename_method`](#dnspy_sourcemap_rename_method)
+  - [`dnspy_sourcemap_rename_parameter`](#dnspy_sourcemap_rename_parameter)
+  - [`dnspy_sourcemap_rename_symbol`](#dnspy_sourcemap_rename_symbol)
+  - [`dnspy_sourcemap_status`](#dnspy_sourcemap_status)
 - **[Debug runtime](#debug-runtime)** (23 tools)
   - [`dnspy_attach_to_process`](#dnspy_attach_to_process)
   - [`dnspy_break_debugger`](#dnspy_break_debugger)
@@ -800,6 +811,11 @@ This reference documents the 180 public `dnspy_*` MCP tools exposed by this repo
 
 ## Editing and patchback
 
+This section covers two distinct patchback modes:
+
+- **Binary patchback** — the `dnspy_rename_*` tools, metadata/resource edits, and `dnspy_save_assembly` modify the assembly on disk.
+- **SourceMap patchback** — the `dnspy_sourcemap_*` family uses HoLLy's SourceMap layer for non-destructive display-name renames, SourceMap-aware decompilation, and SourceMap import/export. These tools intentionally do not fall back to binary renames.
+
 ### `dnspy_add_assembly_reference`
 **Description:** Add an assembly reference (AssemblyRef) by loading a DLL from disk. A TypeForwarder is created to anchor the reference so it persists when saved. Changes are in-memory until dnspy_save_assembly is called.
 
@@ -914,6 +930,61 @@ This reference documents the 180 public `dnspy_*` MCP tools exposed by this repo
 **Description:** Set or clear an individual assembly attribute flag. Changes are in-memory until dnspy_save_assembly is called.
 
 **Attribution:** Upstream
+
+### `dnspy_sourcemap_batch_get_decompiled_source`
+**Description:** Decompile multiple members in one call using HoLLy's SourceMap-aware decompiler and canonical member_ids.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_decompile_method`
+**Description:** Decompile one method or one exact overload using HoLLy's SourceMap-aware decompiler so the output reflects display-name mappings instead of raw metadata names.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_decompile_type`
+**Description:** Decompile a type using HoLLy's SourceMap-aware decompiler so the output reflects display-name mappings from HoLLy's XML cache instead of raw metadata names.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_export`
+**Description:** Export HoLLy's SourceMap XML for one loaded assembly to a chosen path. This mirrors HoLLy's Save SourceMap command and does not modify the binary.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_get_decompiled_source`
+**Description:** Decompile a type or method to source using HoLLy's SourceMap-aware decompiler. For fields, properties, and events, decompiles the declaring type and reports decompile_scope=declaring_type.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_import`
+**Description:** Import a HoLLy SourceMap XML file for one loaded assembly, refresh the corresponding document, and persist the imported map into HoLLy's cache.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_rename_member`
+**Description:** Change a displayed type/member name through HoLLy SourceMap without modifying binary metadata. The new display name is persisted immediately to HoLLy's XML cache.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_rename_method`
+**Description:** Change one method's displayed name through HoLLy SourceMap. Prefer this over sourcemap_rename_member when overload disambiguation by metadata token is needed.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_rename_parameter`
+**Description:** Change a metadata-backed method parameter's displayed name through HoLLy SourceMap without mutating the binary. Accepts either parameter_index or old_name, and old_name can match the current metadata name or the current mapped display name.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_rename_symbol`
+**Description:** Change a displayed type, method, field, property, or event name through HoLLy SourceMap using canonical member_id or legacy symbol reference inputs. This does not touch binary metadata and does not require save_assembly.
+
+**Attribution:** New
+
+### `dnspy_sourcemap_status`
+**Description:** Report whether HoLLy SourceMap integration is available, which SourceMap-aware decompiler variants are loaded, and where HoLLy persists its XML cache.
+
+**Attribution:** New
 
 ## Debug runtime
 

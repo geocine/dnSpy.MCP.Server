@@ -171,6 +171,12 @@ namespace dnSpy.MCP.Server.Application {
 			"rename_method",
 			"rename_symbol",
 			"rename_parameter",
+			"sourcemap_rename_member",
+			"sourcemap_rename_method",
+			"sourcemap_rename_symbol",
+			"sourcemap_rename_parameter",
+			"sourcemap_export",
+			"sourcemap_import",
 			"save_assembly",
 			"edit_assembly_metadata",
 			"remove_assembly_attribute",
@@ -212,6 +218,7 @@ namespace dnSpy.MCP.Server.Application {
 
 		static readonly HashSet<string> destructiveTools = new HashSet<string> {
 			"save_assembly",
+			"sourcemap_export",
 			"remove_assembly_attribute",
 			"add_assembly_reference",
 			"remove_assembly_reference",
@@ -233,6 +240,7 @@ namespace dnSpy.MCP.Server.Application {
 		static readonly HashSet<string> openWorldTools = new HashSet<string> {
 			"load_assembly",
 			"save_assembly",
+			"sourcemap_export",
 			"get_resource",
 			"add_resource",
 			"extract_costura",
@@ -260,6 +268,12 @@ namespace dnSpy.MCP.Server.Application {
 		static readonly HashSet<string> nonIdempotentTools = new HashSet<string> {
 			"rename_symbol",
 			"rename_parameter",
+			"sourcemap_rename_member",
+			"sourcemap_rename_method",
+			"sourcemap_rename_symbol",
+			"sourcemap_rename_parameter",
+			"sourcemap_export",
+			"sourcemap_import",
 			"add_assembly_reference",
 			"remove_assembly_reference",
 			"add_resource",
@@ -302,6 +316,7 @@ namespace dnSpy.MCP.Server.Application {
 			"metadata_and_native",
 			"deobfuscation_and_recovery",
 			"provenance_and_correlation",
+			"sourcemap_patchback",
 			"editing_and_patchback",
 			"debug_runtime",
 			"memory_and_dumping",
@@ -382,6 +397,12 @@ namespace dnSpy.MCP.Server.Application {
 				"match_open_source_candidates" =>
 					"provenance_and_correlation",
 
+				"sourcemap_status" or "sourcemap_decompile_type" or "sourcemap_decompile_method" or
+				"sourcemap_get_decompiled_source" or "sourcemap_batch_get_decompiled_source" or
+				"sourcemap_rename_member" or "sourcemap_rename_method" or "sourcemap_rename_symbol" or
+				"sourcemap_rename_parameter" or "sourcemap_export" or "sourcemap_import" =>
+					"sourcemap_patchback",
+
 				"change_member_visibility" or "rename_member" or "rename_method" or "rename_symbol" or
 				"rename_parameter" or "save_assembly" or "get_assembly_metadata" or "edit_assembly_metadata" or
 				"list_assembly_attributes" or "remove_assembly_attribute" or "set_assembly_flags" or
@@ -451,6 +472,11 @@ namespace dnSpy.MCP.Server.Application {
 				tags.Add("framework");
 				tags.Add("package");
 				tags.Add("known-binary");
+				break;
+			case "sourcemap_patchback":
+				tags.Add("sourcemap");
+				tags.Add("holly");
+				tags.Add("display-name");
 				break;
 			case "editing_and_patchback":
 				tags.Add("rename");

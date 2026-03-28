@@ -30,6 +30,7 @@ using dnSpy.Contracts.Text;
 using dnSpy.MCP.Server.Application;
 using dnSpy.MCP.Server.Communication;
 using dnSpy.MCP.Server.Presentation;
+using HoLLy.dnSpyExtension.Contracts;
 
 namespace dnSpy.MCP.Server.Helper {
 	/// <summary>
@@ -389,6 +390,8 @@ namespace dnSpy.MCP.Server.Helper {
 			LogService<AssemblyTools>(serviceLocator);
 			LogService<TypeTools>(serviceLocator);
 			LogService<EditTools>(serviceLocator);
+			LogService<SourceMapTools>(serviceLocator);
+			LogService<IHoLLySourceMapService>(serviceLocator);
 			LogService<DebugTools>(serviceLocator);
 			LogService<DumpTools>(serviceLocator);
 			LogService<MemoryInspectTools>(serviceLocator);

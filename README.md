@@ -144,9 +144,9 @@ Project config:
 
 ## Tool reference
 
-The exhaustive tool list lives in [docs/tool-reference.md](./docs/tool-reference.md).
+The primary tool reference lives in [docs/tool-reference.md](./docs/tool-reference.md).
 
-Origin breakdown: 180 total — 88 new, 10 enhanced, 82 upstream (carried from the original fork).
+Breakdown: 191 total — 99 new, 10 enhanced, 82 upstream (carried from the original fork).
 
 Upstream removals: 8 utility tools were intentionally dropped from the public surface, mainly skill-storage/config-management tools plus the external `run_de4dot` runner.
 
@@ -161,7 +161,7 @@ Upstream removals: 8 utility tools were intentionally dropped from the public su
 | [Metadata and native analysis](./docs/tool-reference.md#metadata-and-native-analysis) | 13 | 11 | 1 | 1 |
 | [Deobfuscation and recovery](./docs/tool-reference.md#deobfuscation-and-recovery) | 19 | 15 | 1 | 3 |
 | [Provenance and correlation](./docs/tool-reference.md#provenance-and-correlation) | 8 | 8 | 0 | 0 |
-| [Editing and patchback](./docs/tool-reference.md#editing-and-patchback) | 23 | 3 | 0 | 20 |
+| [Editing and patchback](./docs/tool-reference.md#editing-and-patchback) | 34 | 14 | 0 | 20 |
 | [Debug runtime](./docs/tool-reference.md#debug-runtime) | 23 | 2 | 1 | 20 |
 | [Memory and dumping](./docs/tool-reference.md#memory-and-dumping) | 10 | 0 | 1 | 9 |
 | [UI navigation](./docs/tool-reference.md#ui-navigation) | 8 | 6 | 2 | 0 |

@@ -34,6 +34,7 @@ class Build : NukeBuild
     string HollyProjectPath => Path.Combine(HollySubmodulePath, "dnSpy.Extension.HoLLy", "dnSpy.Extension.HoLLy.csproj");
     string McpBuildOutputDir => Path.Combine(Root, "extensions", "dnSpy.MCP.Server", "bin", "Release", "net10.0-windows");
     string HollyBuildOutputDir => Path.Combine(HollySubmodulePath, "dnSpy.Extension.HoLLy", "bin", "Release", "net10.0-windows");
+    string HollyContractsAssemblyName => "dnSpy.Extension.HoLLy.Contracts.dll";
 
     string DnSpyInstallRoot => Path.Combine(DnSpySubmodulePath, "dnSpy", "dnSpy", "bin", "Release", "net10.0-windows");
     string RepoBinLinkPath => Path.Combine(Root, "bin");
@@ -131,7 +132,7 @@ class Build : NukeBuild
         });
 
     Target SyncHolly => _ => _
-        .Description("Fetches the HoLLy submodule, safely tracks the latest origin/master on a local sync branch, and updates nested submodules.")
+        .Description("Fetches the HoLLy submodule, safely tracks the latest origin/master on local master, and updates nested submodules.")
         .DependsOn(PrepareSubmodules)
         .Executes(() =>
         {
@@ -196,6 +197,7 @@ class Build : NukeBuild
             $"-p:DnSpyRoot=\"{DnSpySubmodulePath}\" " +
             $"-p:De4dotRoot=\"{De4dotSubmodulePath}\"");
         CopyDirectoryContents(McpBuildOutputDir, McpInstallDir);
+        PromoteSharedHollyContracts();
         MirrorExtensionToRuntimeDirs("dnSpy.MCP.Server", McpInstallDir);
     }
 
@@ -206,12 +208,13 @@ class Build : NukeBuild
             $"-p:DnSpyRoot=\"{DnSpySubmodulePath}\" " +
             $"-p:EchoRoot=\"{EchoSubmodulePath}\"");
         CopyDirectoryContents(HollyBuildOutputDir, HollyInstallDir);
+        PromoteSharedHollyContracts();
         MirrorExtensionToRuntimeDirs("dnSpy.Extension.HoLLy", HollyInstallDir);
     }
 
     void SyncHollySubmodule()
     {
-        const string syncBranchName = "monorepo-sync";
+        const string syncBranchName = "master";
 
         var previousTargetCommit = TryRunGitCapture($"-C \"{HollySubmodulePath}\" rev-parse --verify origin/master");
         RunGit($"-C \"{HollySubmodulePath}\" fetch origin --prune", logOutput: false);
@@ -327,6 +330,46 @@ class Build : NukeBuild
             var destinationDirectory = Path.Combine(runtimeRoot, "Extensions", extensionName);
             CopyDirectoryContents(sourceDirectory, destinationDirectory);
         }
+    }
+
+    void PromoteSharedHollyContracts()
+    {
+        var sourceCandidates = new[] {
+            Path.Combine(McpBuildOutputDir, HollyContractsAssemblyName),
+            Path.Combine(HollyBuildOutputDir, HollyContractsAssemblyName)
+        };
+
+        var sourcePath = sourceCandidates.FirstOrDefault(File.Exists);
+        if (string.IsNullOrWhiteSpace(sourcePath))
+            return;
+
+        CopySharedContract(sourcePath, DnSpyInstallRoot);
+        RemoveSharedContract(Path.Combine(McpInstallDir, HollyContractsAssemblyName));
+        RemoveSharedContract(Path.Combine(HollyInstallDir, HollyContractsAssemblyName));
+
+        foreach (var runtime in new[] { "win-x64", "win-x86" })
+        {
+            var runtimeRoot = Path.Combine(DnSpyInstallRoot, runtime);
+            if (!Directory.Exists(runtimeRoot))
+                continue;
+
+            CopySharedContract(sourcePath, runtimeRoot);
+            RemoveSharedContract(Path.Combine(runtimeRoot, "Extensions", "dnSpy.MCP.Server", HollyContractsAssemblyName));
+            RemoveSharedContract(Path.Combine(runtimeRoot, "Extensions", "dnSpy.Extension.HoLLy", HollyContractsAssemblyName));
+        }
+    }
+
+    void CopySharedContract(string sourcePath, string destinationDirectory)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+        var destinationPath = Path.Combine(destinationDirectory, HollyContractsAssemblyName);
+        File.Copy(sourcePath, destinationPath, overwrite: true);
+    }
+
+    void RemoveSharedContract(string contractPath)
+    {
+        if (File.Exists(contractPath))
+            File.Delete(contractPath);
     }
 
     void EnsureRepoBinLink()

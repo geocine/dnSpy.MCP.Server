@@ -43,6 +43,8 @@ namespace dnSpy.MCP.Server.Application
                 tools.AddRange(GetEditToolSchemas());
                 tools.AddRange(GetResourceToolSchemas());
             }
+            if (CanResolve<SourceMapTools>())
+                tools.AddRange(GetSourceMapToolSchemas());
             if (CanResolve<DebugTools>())
                 tools.AddRange(GetDebugToolSchemas());
             if (CanResolve<MemoryInspectTools>() || CanResolve<DumpTools>())
@@ -1894,7 +1896,7 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "rename_member",
-                Description = "Rename a type or one of its members (method, field, property, event). Changes are in-memory until save_assembly is called.",
+                Description = "Rename a type or one of its members (method, field, property, event) by mutating binary metadata names in memory. Use sourcemap_rename_member for HoLLy display-name mapping instead. Binary changes remain in-memory until save_assembly is called.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -1909,7 +1911,7 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "rename_method",
-                Description = "Rename a method safely using its declaring type and optional metadata token. Prefer this over rename_member for overloaded methods. Changes are in-memory until save_assembly is called.",
+                Description = "Rename a method safely using its declaring type and optional metadata token by mutating binary metadata names in memory. Prefer sourcemap_rename_method for non-destructive HoLLy display-name mapping. Binary changes remain in-memory until save_assembly is called.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -1924,7 +1926,7 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "rename_symbol",
-                Description = "Rename a type, method, field, property, or event by canonical member_id or legacy symbol reference inputs. Prefer this for incremental reverse-engineering because member_id stays stable even after earlier renames. Changes are in-memory until save_assembly is called.",
+                Description = "Rename a type, method, field, property, or event by canonical member_id or legacy symbol reference inputs by mutating binary metadata names in memory. Prefer sourcemap_rename_symbol for HoLLy display-name mapping. Binary changes remain in-memory until save_assembly is called.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -1946,7 +1948,7 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "rename_parameter",
-                Description = "Rename a method parameter by canonical method member_id or legacy method reference inputs. This patches metadata-backed parameter names, not transient decompiler locals. Changes are in-memory until save_assembly is called.",
+                Description = "Rename a method parameter by canonical method member_id or legacy method reference inputs by mutating metadata-backed parameter names in memory, not transient decompiler locals. Use sourcemap_rename_parameter only for the HoLLy SourceMap seam. Binary changes remain in-memory until save_assembly is called.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -1965,7 +1967,7 @@ namespace dnSpy.MCP.Server.Application
             },
             new ToolInfo {
                 Name = "save_assembly",
-                Description = "Save a (possibly modified) assembly to disk. Persists all in-memory changes made by rename_member, rename_method, change_member_visibility, edit_assembly_metadata, etc.",
+                Description = "Save a (possibly modified) assembly to disk. Persists binary in-memory changes made by rename_member, rename_method, change_member_visibility, edit_assembly_metadata, and similar tools. HoLLy SourceMap display-name edits are already persisted to HoLLy's XML cache and do not require save_assembly.",
                 InputSchema = new Dictionary<string, object> {
                     ["type"] = "object",
                     ["properties"] = new Dictionary<string, object> {
@@ -2799,6 +2801,179 @@ namespace dnSpy.MCP.Server.Application
         };
 
         // ── Utility tools ─────────────────────────────────────────────────────────
+        List<ToolInfo> GetSourceMapToolSchemas() => new List<ToolInfo> {
+            new ToolInfo {
+                Name = "sourcemap_status",
+                Description = "Report whether HoLLy SourceMap integration is available, which SourceMap-aware decompiler variants are loaded, and where HoLLy persists its XML cache.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object>(),
+                    ["required"] = new List<string>()
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_decompile_type",
+                Description = "Decompile a type using HoLLy's SourceMap-aware decompiler so the output reflects display-name mappings from HoLLy's XML cache instead of raw metadata names.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Full type name to decompile." }
+                    },
+                    ["required"] = new List<string> { "assembly_name", "type_full_name" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_decompile_method",
+                Description = "Decompile one method or one exact overload using HoLLy's SourceMap-aware decompiler so the output reflects display-name mappings instead of raw metadata names.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Declaring type full name." },
+                        ["method_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Method name to decompile." },
+                        ["signature"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional exact full signature to select one overload." }
+                    },
+                    ["required"] = new List<string> { "assembly_name", "type_full_name", "method_name" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_get_decompiled_source",
+                Description = "Decompile a type or method to source using HoLLy's SourceMap-aware decompiler. For fields, properties, and events, decompiles the declaring type and reports decompile_scope=declaring_type.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["member_id"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Canonical member_id in the format {module_mvid_n32}:{metadata_token_hex8}:{kind}." },
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name. Required unless member_id is provided." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Declaring type full name when using legacy symbol reference inputs." },
+                        ["method_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Method name when using legacy symbol reference inputs." },
+                        ["method_signature"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional exact method signature to disambiguate overloads." },
+                        ["field_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Field name when using legacy symbol reference inputs." },
+                        ["property_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Property name when using legacy symbol reference inputs." },
+                        ["event_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Event name when using legacy symbol reference inputs." }
+                    },
+                    ["required"] = new List<string>()
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_batch_get_decompiled_source",
+                Description = "Decompile multiple members in one call using HoLLy's SourceMap-aware decompiler and canonical member_ids.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["member_ids"] = new Dictionary<string, object> {
+                            ["type"] = "array",
+                            ["items"] = new Dictionary<string, object> { ["type"] = "string" },
+                            ["description"] = "Array of canonical member_ids to decompile."
+                        }
+                    },
+                    ["required"] = new List<string> { "member_ids" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_rename_member",
+                Description = "Change a displayed type/member name through HoLLy SourceMap without modifying binary metadata. The new display name is persisted immediately to HoLLy's XML cache.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Declaring type full name." },
+                        ["member_kind"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Kind of member: type, method, field, property, or event." },
+                        ["old_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Current metadata name used to resolve the member." },
+                        ["new_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "New display name to persist in HoLLy's SourceMap cache." }
+                    },
+                    ["required"] = new List<string> { "assembly_name", "type_full_name", "member_kind", "old_name", "new_name" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_rename_method",
+                Description = "Change one method's displayed name through HoLLy SourceMap. Prefer this over sourcemap_rename_member when overload disambiguation by metadata token is needed.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Declaring type full name." },
+                        ["method_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Current method name. Required even when method_token is provided." },
+                        ["new_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "New display name to persist in HoLLy's SourceMap cache." },
+                        ["method_token"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional metadata token to disambiguate overloads, for example 0x06001234." }
+                    },
+                    ["required"] = new List<string> { "assembly_name", "type_full_name", "method_name", "new_name" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_rename_symbol",
+                Description = "Change a displayed type, method, field, property, or event name through HoLLy SourceMap using canonical member_id or legacy symbol reference inputs. This does not touch binary metadata and does not require save_assembly.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["member_id"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Canonical member_id in the format {module_mvid_n32}:{metadata_token_hex8}:{kind}." },
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name. Required unless member_id is provided." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Declaring type full name when using legacy symbol reference inputs." },
+                        ["method_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Method name when using legacy symbol reference inputs." },
+                        ["method_signature"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional exact method signature to disambiguate overloads." },
+                        ["field_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Field name when using legacy symbol reference inputs." },
+                        ["property_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Property name when using legacy symbol reference inputs." },
+                        ["event_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Event name when using legacy symbol reference inputs." },
+                        ["member_kind"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Legacy fallback kind: type, method, field, property, or event." },
+                        ["member_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Legacy fallback member name used with member_kind." },
+                        ["new_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "New display name to persist in HoLLy's SourceMap cache." }
+                    },
+                    ["required"] = new List<string> { "new_name" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_rename_parameter",
+                Description = "Change a metadata-backed method parameter's displayed name through HoLLy SourceMap without mutating the binary. Accepts either parameter_index or old_name, and old_name can match the current metadata name or the current mapped display name.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["member_id"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Canonical method member_id." },
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name. Required unless member_id is provided." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["type_full_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Declaring type full name when using legacy reference inputs." },
+                        ["method_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Method name when using legacy reference inputs." },
+                        ["method_signature"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional exact method signature to disambiguate overloads." },
+                        ["parameter_index"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "Zero-based parameter index among real parameters." },
+                        ["old_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Existing parameter metadata name or current mapped display name. Use this instead of parameter_index if you prefer name-based targeting." },
+                        ["new_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "New display name to persist to HoLLy's SourceMap cache." }
+                    },
+                    ["required"] = new List<string> { "new_name" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_export",
+                Description = "Export HoLLy's SourceMap XML for one loaded assembly to a chosen path. This mirrors HoLLy's Save SourceMap command and does not modify the binary.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name. Required unless file_path is provided." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["output_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Destination XML file path." }
+                    },
+                    ["required"] = new List<string> { "output_path" }
+                }
+            },
+            new ToolInfo {
+                Name = "sourcemap_import",
+                Description = "Import a HoLLy SourceMap XML file for one loaded assembly, refresh the corresponding document, and persist the imported map into HoLLy's cache.",
+                InputSchema = new Dictionary<string, object> {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object> {
+                        ["assembly_name"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Loaded assembly name. Required unless file_path is provided." },
+                        ["file_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Optional absolute FilePath from dnspy_list_assemblies." },
+                        ["input_path"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "Existing SourceMap XML file path." }
+                    },
+                    ["required"] = new List<string> { "input_path" }
+                }
+            },
+        };
+
         List<ToolInfo> GetUtilityToolSchemas() => new List<ToolInfo> {
             new ToolInfo {
                 Name = "list_tools",
@@ -3053,7 +3228,7 @@ namespace dnSpy.MCP.Server.Application
                     ["properties"] = new Dictionary<string, object> {
                         ["groups"] = new Dictionary<string, object> {
                             ["type"] = "array",
-                            ["description"] = "Tool groups to enable for this session, for example source_and_decompile, reconstruction_core, architecture_and_xrefs, or debug_runtime.",
+                            ["description"] = "Tool groups to enable for this session, for example source_and_decompile, sourcemap_patchback, reconstruction_core, architecture_and_xrefs, or debug_runtime.",
                             ["items"] = new Dictionary<string, object> {
                                 ["type"] = "string"
                             }
