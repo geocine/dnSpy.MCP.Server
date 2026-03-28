@@ -1,6 +1,7 @@
 [submodule "dnSpy"]
 	path = hosts/dnSpy
-	url = https://github.com/dnSpyEx/dnSpy.git
+	url = https://github.com/geocine/dnSpy.git
+	branch = geocine
 [submodule "de4dotEx"]
 	path = vendors/de4dotEx
 	url = https://github.com/GDATAAdvancedAnalytics/de4dotEx.git
