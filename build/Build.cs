@@ -210,6 +210,7 @@ class Build : NukeBuild
         CopyDirectoryContents(HollyBuildOutputDir, HollyInstallDir);
         PromoteSharedHollyContracts();
         MirrorExtensionToRuntimeDirs("dnSpy.Extension.HoLLy", HollyInstallDir);
+        RemoveTopLevelHollyBinaries();
     }
 
     void SyncHollySubmodule()
@@ -370,6 +371,36 @@ class Build : NukeBuild
     {
         if (File.Exists(contractPath))
             File.Delete(contractPath);
+    }
+
+    void RemoveTopLevelHollyBinaries()
+    {
+        RemoveFiles(DnSpyInstallRoot, new[] {
+            "dnSpy.Extension.HoLLy.x.dll",
+            "dnSpy.Extension.HoLLy.EchoPlatforms.dll"
+        });
+
+        foreach (var runtime in new[] { "win-x64", "win-x86" })
+        {
+            var runtimeRoot = Path.Combine(DnSpyInstallRoot, runtime);
+            if (!Directory.Exists(runtimeRoot))
+                continue;
+
+            RemoveFiles(runtimeRoot, new[] {
+                "dnSpy.Extension.HoLLy.x.dll",
+                "dnSpy.Extension.HoLLy.EchoPlatforms.dll"
+            });
+        }
+    }
+
+    void RemoveFiles(string directory, string[] fileNames)
+    {
+        foreach (var fileName in fileNames)
+        {
+            var path = Path.Combine(directory, fileName);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     void EnsureRepoBinLink()

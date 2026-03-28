@@ -76,6 +76,13 @@ namespace dnSpy.MCP.Server.Configuration
         public bool EnableRunScript { get; set; } = false;
 
         /// <summary>
+        /// If true, MCP resources/list exposes the bundled BepInEx markdown docs.
+        /// Disabled by default because they are auxiliary reference material, not core dnSpy data.
+        /// </summary>
+        [JsonPropertyName("exposeBepInExDocs")]
+        public bool ExposeBepInExDocs { get; set; } = false;
+
+        /// <summary>
         /// If true, MCP tools/list exposes the full tool catalog for compatibility with older clients.
         /// If false (default), tools/list exposes only the bootstrap discovery/code-mode surface.
         /// </summary>

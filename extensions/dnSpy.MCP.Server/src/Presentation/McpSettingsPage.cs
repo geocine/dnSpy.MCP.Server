@@ -67,6 +67,7 @@ namespace dnSpy.MCP.Server.Presentation {
 		bool requireApiKey;
 		string apiKey = string.Empty;
 		bool enableRunScript;
+		bool exposeBepInExDocs;
 		bool exposeFullToolCatalog;
 		bool allowImplicitDefaultSession = true;
 		string implicitDefaultSessionId = "__implicit_http_session__";
@@ -145,6 +146,16 @@ namespace dnSpy.MCP.Server.Presentation {
 				if (enableRunScript != value) {
 					enableRunScript = value;
 					OnPropertyChanged(nameof(EnableRunScript));
+				}
+			}
+		}
+
+		public bool ExposeBepInExDocs {
+			get => exposeBepInExDocs;
+			set {
+				if (exposeBepInExDocs != value) {
+					exposeBepInExDocs = value;
+					OnPropertyChanged(nameof(ExposeBepInExDocs));
 				}
 			}
 		}
@@ -274,6 +285,7 @@ namespace dnSpy.MCP.Server.Presentation {
 			RequireApiKey = cfg.RequireApiKey;
 			ApiKey = cfg.ApiKey;
 			EnableRunScript = cfg.EnableRunScript;
+			ExposeBepInExDocs = cfg.ExposeBepInExDocs;
 			ExposeFullToolCatalog = cfg.ExposeFullToolCatalog;
 			AllowImplicitDefaultSession = cfg.AllowImplicitDefaultSession;
 			ImplicitDefaultSessionId = cfg.ImplicitDefaultSessionId;
@@ -290,6 +302,7 @@ namespace dnSpy.MCP.Server.Presentation {
 			sharedViewModel.RequireApiKey = RequireApiKey;
 			sharedViewModel.ApiKey = ApiKey;
 			sharedViewModel.EnableRunScript = EnableRunScript;
+			sharedViewModel.ExposeBepInExDocs = ExposeBepInExDocs;
 			sharedViewModel.ExposeFullToolCatalog = ExposeFullToolCatalog;
 			sharedViewModel.AllowImplicitDefaultSession = AllowImplicitDefaultSession;
 			sharedViewModel.ImplicitDefaultSessionId = ImplicitDefaultSessionId;

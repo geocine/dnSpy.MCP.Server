@@ -63,6 +63,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable server" />
@@ -83,23 +84,26 @@
                             <TextBlock Grid.Row="5" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable run_script" />
                             <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableRunScript}" />
 
-                            <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Expose full tool catalog" />
-                            <CheckBox Grid.Row="6" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding ExposeFullToolCatalog}" />
+                            <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Expose BepInEx docs resources" />
+                            <CheckBox Grid.Row="6" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding ExposeBepInExDocs}" />
 
-                            <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Allow implicit default session" />
-                            <CheckBox Grid.Row="7" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding AllowImplicitDefaultSession}" />
+                            <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Expose full tool catalog" />
+                            <CheckBox Grid.Row="7" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding ExposeFullToolCatalog}" />
 
-                            <TextBlock Grid.Row="8" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Implicit default session ID" />
-                            <TextBox Grid.Row="8" Grid.Column="1" Margin="0,4,0,4" Text="{Binding ImplicitDefaultSessionId, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Grid.Row="8" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Allow implicit default session" />
+                            <CheckBox Grid.Row="8" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding AllowImplicitDefaultSession}" />
 
-                            <TextBlock Grid.Row="9" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Log level" />
-                            <ComboBox Grid.Row="9" Grid.Column="1" Margin="0,4,0,4" Width="140" HorizontalAlignment="Left" ItemsSource="{Binding AvailableLogLevels}" SelectedItem="{Binding LogLevel}" />
+                            <TextBlock Grid.Row="9" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Implicit default session ID" />
+                            <TextBox Grid.Row="9" Grid.Column="1" Margin="0,4,0,4" Text="{Binding ImplicitDefaultSessionId, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <TextBlock Grid.Row="10" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable file logging" />
-                            <CheckBox Grid.Row="10" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableFileLogging}" />
+                            <TextBlock Grid.Row="10" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Log level" />
+                            <ComboBox Grid.Row="10" Grid.Column="1" Margin="0,4,0,4" Width="140" HorizontalAlignment="Left" ItemsSource="{Binding AvailableLogLevels}" SelectedItem="{Binding LogLevel}" />
 
-                            <TextBlock Grid.Row="11" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable output pane logging" />
-                            <CheckBox Grid.Row="11" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableOutputPaneLogging}" />
+                            <TextBlock Grid.Row="11" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable file logging" />
+                            <CheckBox Grid.Row="11" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableFileLogging}" />
+
+                            <TextBlock Grid.Row="12" Grid.Column="0" Margin="0,6,12,6" VerticalAlignment="Center" Text="Enable output pane logging" />
+                            <CheckBox Grid.Row="12" Grid.Column="1" Margin="0,4,0,4" IsChecked="{Binding EnableOutputPaneLogging}" />
                         </Grid>
 
                         <TextBlock Text="Tooling" FontWeight="SemiBold" Margin="0,0,0,8" />

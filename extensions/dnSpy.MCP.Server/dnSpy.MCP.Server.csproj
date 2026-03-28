@@ -78,6 +78,12 @@
     <Page Include="src\**\*.xaml" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="resources\bepinex\*.md">
+      <LogicalName>dnSpy.MCP.Server.Resources.BepInEx.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <!-- Config file deployed alongside the DLL - user edits are preserved on rebuild -->
   <ItemGroup>
     <None Include="mcp-config.json">

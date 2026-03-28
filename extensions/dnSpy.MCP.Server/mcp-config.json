@@ -5,6 +5,7 @@
   "requireApiKey": false,
   "apiKey": "",
   "enableRunScript": false,
+  "exposeBepInExDocs": false,
   "exposeFullToolCatalog": false,
   "allowImplicitDefaultSession": true,
   "implicitDefaultSessionId": "__implicit_http_session__",
