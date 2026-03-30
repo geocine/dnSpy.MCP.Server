@@ -6,6 +6,10 @@ An embedded MCP server for dnSpy focused on .NET reconstruction, decompilation, 
 
 [Tool reference](./docs/tool-reference.md) | [Architecture](./docs/ARCHITECTURE.md) | [Changelog](./CHANGELOG.md) | [Contributing](CONTRIBUTING.md)
 
+<center>
+<img width="1076" height="672" alt="image" src="https://github.com/user-attachments/assets/d45900d9-6fa1-4391-9da4-65416448d0b1" />
+</center>
+
 ## Requirements
 
 - Windows
