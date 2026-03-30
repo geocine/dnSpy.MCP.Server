@@ -4,7 +4,7 @@ An embedded MCP server for dnSpy focused on .NET reconstruction, decompilation, 
 
 > Forked from [chichicaste/dnSpy.MCP.Server](https://github.com/chichicaste/dnSpy.MCP.Server).
 
-[Tool reference](./docs/tool-reference.md) | [Architecture](./docs/ARCHITECTURE.md) | [Changelog](./CHANGELOG.md)
+[Tool reference](./docs/tool-reference.md) | [Architecture](./docs/ARCHITECTURE.md) | [Changelog](./CHANGELOG.md) | [Contributing](CONTRIBUTING.md)
 
 ## Requirements
 
@@ -166,6 +166,12 @@ Upstream removals: 8 utility tools were intentionally dropped from the public su
 | [Memory and dumping](./docs/tool-reference.md#memory-and-dumping) | 10 | 0 | 1 | 9 |
 | [UI navigation](./docs/tool-reference.md#ui-navigation) | 8 | 6 | 2 | 0 |
 | [Scripting](./docs/tool-reference.md#scripting) | 1 | 0 | 0 | 1 |
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request.
+
+The short version: **open an issue first** describing what you want to change and wait for maintainer approval. If the change fits the project, I'll add you as a collaborator so you can push a branch directly.
 
 ## License
 
